@@ -6,7 +6,10 @@
   "description": "Registre de collecteurs pour la veille Journal 44 — Studio Niko Design",
   "scripts": {
     "stub": "node radar-run.mjs --stub",
-    "radar": "node radar-run.mjs"
+    "radar": "node radar-run.mjs",
+    "test": "node test-registry.mjs && node test-adapter.mjs && node test-e2e.mjs"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }
