@@ -1,0 +1,12 @@
+{
+  "name": "radar-de-niko",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Registre de collecteurs pour la veille Journal 44 — Studio Niko Design",
+  "scripts": {
+    "stub": "node radar-run.mjs --stub",
+    "radar": "node radar-run.mjs"
+  },
+  "engines": { "node": ">=18" }
+}
