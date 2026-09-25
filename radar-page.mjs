@@ -173,9 +173,9 @@ ${sweep(items, sources, now)}
       setTimeout(function(){location.reload();},45000);
       return;
     }catch(e){
-      manual.textContent='GitHub →';
-      window.open('https://github.com/Nikoju1977/radar-de-niko/actions/workflows/radar-auto.yml','_blank','noopener');
-      setTimeout(function(){manual.disabled=false;manual.textContent=old;},3000);
+      manual.textContent='⚠ Mise à jour indisponible';
+      manual.title='Le backend de mise à jour ne répond pas';
+      setTimeout(function(){manual.disabled=false;manual.textContent=old;manual.title='Lancer immédiatement Radar Auto';},4000);
     }
   });
 
