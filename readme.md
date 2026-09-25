@@ -27,7 +27,8 @@ Ajouter une source = ajouter un `defineCollector()`. Rien d'autre à toucher.
 | Fichier | Rôle |
 |---|---|
 | `radar-registry.mjs` | Noyau : validation, ordonnancement, exécution, sorties |
-| `radar-collectors.mjs` | Un bloc par source (Twitter, Reddit, YouTube, Exa, pertinence 44) |
+| `radar-collectors.mjs` | Un bloc par source (Google News, Twitter, Reddit, YouTube, Exa, pertinence 44) |
+| `radar-agent-reach.mjs` | Clients HTTP des plateformes (reprises, OAuth Reddit, parseur RSS) |
 | `radar-run.mjs` | Point d'entrée CLI |
 
 ## Utilisation
@@ -44,6 +45,7 @@ Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`.
 
 | Source | Variable(s) | Sans clé |
 |---|---|---|
+| Google News (RSS) | aucune | fonctionne partout |
 | Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (optionnels) | JSON public — refusé (403) depuis les IP GitHub Actions |
 | YouTube | `YOUTUBE_API_KEY` | ignorée |
 | Exa | `EXA_API_KEY` | ignorée |

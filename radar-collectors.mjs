@@ -98,6 +98,24 @@ defineCollector({
   }
 });
 
+defineCollector({
+  id: 'reach_gnews',
+  name: 'Google News',
+  source: 'gnews',
+  version: '1.0',
+  retries: 2,
+  collect: async ({ query, since, signal }) => {
+    const raw = await reach('gnews', { query, since, limit: 60, signal });
+    return raw.map(n => ({
+      title: n.title,
+      url: n.url,
+      publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null,
+      author: n.source,
+      summary: n.description
+    }));
+  }
+});
+
 /* ─── Collecteur dépendant : ne tourne qu'après les sources ──── */
 
 defineCollector({
@@ -106,10 +124,10 @@ defineCollector({
   source: 'radar',
   version: '2.0',
   mode: 'enrich',                       // patche les items retenus, n'en crée aucun
-  requires: ['reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'],
+  requires: ['reach_gnews', 'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'],
   collect: ({ results }) => {
     const TERMS = /(loire-atlantique|nantes|châteaubriant|chateaubriant|ancenis|blain|nozay|meilleraye|derval|guémené|guemene|\b44\b)/i;
-    const pool = ['reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa']
+    const pool = ['reach_gnews', 'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa']
       .flatMap(id => results.get(id)?.items ?? []);
 
     return pool

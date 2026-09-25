@@ -7,7 +7,7 @@
  * elles-mêmes — seul un run avec clés peut valider ce dernier point.
  */
 
-import { search, missingKeys } from './radar-agent-reach.mjs';
+import { search, missingKeys, parseRSS } from './radar-agent-reach.mjs';
 
 delete process.env.REDDIT_CLIENT_ID; delete process.env.REDDIT_CLIENT_SECRET;
 
@@ -186,4 +186,26 @@ delete process.env.REDDIT_CLIENT_ID; delete process.env.REDDIT_CLIENT_SECRET;
 ok('missingKeys : reddit sans clé requise', missingKeys('reddit', {}).length === 0);
 ok('missingKeys : exa signale sa clé', missingKeys('exa', {})[0] === 'EXA_API_KEY');
 ok('missingKeys : twitter satisfait', missingKeys('twitter', { TWITTER_BEARER_TOKEN: 't' }).length === 0);
+globalThis.fetch = realFetch;
+
+/* ─── Google News RSS ─────────────────────────────────────────── */
+const RSS = `<?xml version="1.0"?><rss><channel><title>x</title>
+<item><title>Nozay : la gare rouvre &amp; le bus suit - Ouest-France</title>
+<link>https://news.google.com/rss/articles/abc?oc=5</link><pubDate>Thu, 24 Sep 2026 08:00:00 GMT</pubDate>
+<description><![CDATA[<a href="x">Nozay : la gare rouvre</a>&nbsp;<font>Ouest-France</font>]]></description>
+<source url="https://www.ouest-france.fr">Ouest-France</source></item>
+<item><title>Titre &#233;l&#xE9;ment</title><link>https://ex.com/2</link><pubDate>n'importe quoi</pubDate></item>
+</channel></rss>`;
+const parsed = parseRSS(RSS);
+ok('rss : 2 items', parsed.length === 2);
+ok('rss : suffixe « - Source » retiré, entités décodées', parsed[0].title === 'Nozay : la gare rouvre & le bus suit');
+ok('rss : source extraite', parsed[0].source === 'Ouest-France');
+ok('rss : description CDATA nettoyée du HTML', !/[<>]/.test(parsed[0].description));
+ok('rss : entités numériques', parsed[1].title === 'Titre élément');
+
+mockFetch([['news.google.com/rss/search', (u, init) => ({ body: null, text: RSS, _u: u, _a: init.headers.accept })]]);
+globalThis.fetch = (orig => async (u, i) => { const r = await orig(u, i); r.text = async () => RSS; return r; })(globalThis.fetch);
+r = await search('gnews', { query: 'Nozay', since: '2026-09-01', limit: 10 });
+ok('gnews : items récupérés sans clé', r.length === 2);
+ok('gnews : paramètres FR + filtre after:', /hl=fr/.test(calls[0].url) && /after%3A2026-09-01/.test(calls[0].url));
 globalThis.fetch = realFetch;

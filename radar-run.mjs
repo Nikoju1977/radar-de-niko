@@ -51,6 +51,10 @@ if (flag('stub')) {
       { title: 'Sans titre exploitable', url: '', created_utc: now / 1000, author: 'u/bot', score: 0 }
     ],
     youtube: [],
+    gnews: [
+      { title: 'Derval : la foire d\'automne attire 3 000 visiteurs', url: 'https://www.ouest-france.fr/derval-foire?utm_medium=rss',
+        pubDate: new Date(now - 54e5).toUTCString(), source: 'Ouest-France', description: 'Record battu cette année.' }
+    ],
     exa: [
       { title: 'La Meilleraye-de-Bretagne inaugure sa médiathèque',
         url: 'https://actu.fr/pays-de-la-loire/article?fbclid=abc', publishedDate: new Date(now - 108e5).toISOString(),
@@ -110,7 +114,7 @@ console.log(`→ ${outDir}/radar.xml · radar.jsonl · radar.md`);
 if (failed.length) console.log(`⚠ ${failed.length} source(s) en échec — la veille reste exploitable.`);
 
 // Annotations GitHub Actions : chaque panne visible dans l'interface du run.
-if (process.env.GITHUB_ACTIONS === 'true') {
+if (process.env.GITHUB_ACTIONS === 'true' && !flag('stub')) {
   const esc = t => String(t).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
   for (const p of unavailable) console.log(`::notice title=${p} ignoré::clé absente des secrets du dépôt`);
   for (const r of failed) console.log(`::error title=${r.collector.id}::${esc(r.error)}`);

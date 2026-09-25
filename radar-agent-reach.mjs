@@ -32,7 +32,8 @@ class HttpError extends Error {
   }
 }
 
-async function request(url, { method = 'GET', headers = {}, body = null,
+async function request(url, { method = 'GET', headers = {}, body = null, as = 'json',
+                              accept = 'application/json',
                               signal = null, retries = 2, timeout = 20000 } = {}) {
   for (let attempt = 0; ; attempt++) {
     const ac = new AbortController();
@@ -43,7 +44,7 @@ async function request(url, { method = 'GET', headers = {}, body = null,
     try {
       const res = await fetch(url, {
         method, body, signal: ac.signal,
-        headers: { 'user-agent': UA, accept: 'application/json', ...headers }
+        headers: { 'user-agent': UA, accept, ...headers }
       });
 
       if (res.status === 429 || res.status >= 500) {
@@ -56,7 +57,7 @@ async function request(url, { method = 'GET', headers = {}, body = null,
         throw new HttpError(res.status, url, await res.text().catch(() => ''));
       }
       if (!res.ok) throw new HttpError(res.status, url, await res.text().catch(() => ''));
-      return res.json();
+      return as === 'text' ? res.text() : res.json();
     } catch (e) {
       if (e.name === 'AbortError' && !signal?.aborted) {
         if (attempt < retries) continue;
@@ -248,14 +249,48 @@ async function twitter({ query, since, limit = 50, signal }) {
   return out.slice(0, limit);
 }
 
+/** Google News — flux RSS de recherche, sans clé. */
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+const decode = t => String(t ?? '')
+  .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+  .replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) => e[0] === '#'
+    ? String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : +e.slice(1))
+    : ENT[e.toLowerCase()] ?? m);
+const strip = h => decode(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const tag = (xml, name) => xml.match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`, 'i'))?.[1] ?? null;
+
+export function parseRSS(xml) {
+  return [...String(xml).matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(([, it]) => {
+    const source = strip(tag(it, 'source'));
+    let title = strip(tag(it, 'title'));
+    if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -source.length - 3);
+    return {
+      title,
+      url: decode(tag(it, 'link')).trim() || null,
+      pubDate: decode(tag(it, 'pubDate')).trim() || null,
+      source: source || null,
+      description: strip(tag(it, 'description')) || null
+    };
+  });
+}
+
+async function gnews({ query, since, limit = 50, signal }) {
+  const u = new URL('https://news.google.com/rss/search');
+  u.searchParams.set('q', since ? `${query} after:${new Date(since).toISOString().slice(0, 10)}` : query);
+  u.searchParams.set('hl', 'fr'); u.searchParams.set('gl', 'FR'); u.searchParams.set('ceid', 'FR:fr');
+  const xml = await request(u.toString(), { signal, accept: 'application/rss+xml, application/xml' , as: 'text' });
+  return parseRSS(xml).slice(0, limit);
+}
+
 /* ═══════════════════════════════════════════════════════════
    Façade
    ═══════════════════════════════════════════════════════════ */
 
-const PLATFORMS = { reddit, youtube, exa, twitter };
+const PLATFORMS = { gnews, reddit, youtube, exa, twitter };
 
 /** Clés obligatoires par plateforme (Reddit : aucune, OAuth optionnel). */
 const REQUIRED = {
+  gnews: [],
   reddit: [],
   youtube: ['YOUTUBE_API_KEY'],
   exa: ['EXA_API_KEY'],
