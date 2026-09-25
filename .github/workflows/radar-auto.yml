@@ -1,9 +1,7 @@
 name: Radar Auto
 
 on:
-  # Mise à jour automatique du flux RSS toutes les 15 minutes.
-  schedule:
-    - cron: '7,22,37,52 * * * *'
+  # Déclenché toutes les 15 minutes par Radar Clock.
   workflow_dispatch:
   # Permet de valider immédiatement ce workflow lorsqu'il est modifié.
   push:
