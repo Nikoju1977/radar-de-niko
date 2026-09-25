@@ -109,6 +109,13 @@ const failed = run.reports.filter(r => r.status === 'error');
 console.log(`→ ${outDir}/radar.xml · radar.jsonl · radar.md`);
 if (failed.length) console.log(`⚠ ${failed.length} source(s) en échec — la veille reste exploitable.`);
 
+// Annotations GitHub Actions : chaque panne visible dans l'interface du run.
+if (process.env.GITHUB_ACTIONS === 'true') {
+  const esc = t => String(t).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  for (const p of unavailable) console.log(`::notice title=${p} ignoré::clé absente des secrets du dépôt`);
+  for (const r of failed) console.log(`::error title=${r.collector.id}::${esc(r.error)}`);
+}
+
 // Code de sortie : 3 si aucune source n'a pu tourner avec succès (veille vide par panne).
 const sources = run.reports.filter(r => r.collector.mode !== 'enrich');
 if (!flag('stub') && sources.length && !sources.some(r => r.status === 'ok' || r.status === 'empty')) {

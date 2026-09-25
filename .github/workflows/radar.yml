@@ -21,15 +21,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: radar-${{ github.ref }}
+  group: radar-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: '22' }
       - name: Syntaxe
         run: for f in *.mjs; do node --check "$f"; done
@@ -45,8 +45,8 @@ jobs:
     needs: tests
     if: github.event_name != 'push'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: '22' }
       - name: Run réel
         env:
@@ -67,7 +67,7 @@ jobs:
       - name: Résumé
         if: always()
         run: '[ -f dist/radar.md ] && cat dist/radar.md >> "$GITHUB_STEP_SUMMARY" || true'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: radar
