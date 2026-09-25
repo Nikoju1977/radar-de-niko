@@ -124,6 +124,8 @@ b.nv{background:var(--ambre);color:var(--fond)}
 b.t44{border:1px solid var(--phos);color:var(--phos)}
 .hide{display:none}
 .install{font:inherit;font-size:14px;color:var(--fond);background:var(--ambre);border:0;border-radius:2px;padding:6px 12px;min-height:36px;cursor:pointer;margin-left:8px}
+.manual{display:inline-block;font:inherit;font-size:14px;color:var(--fond)!important;background:var(--phos);border:0;border-radius:2px;padding:6px 10px;min-height:36px;line-height:24px;text-decoration:none!important;margin-left:8px;white-space:nowrap}
+.manual:hover{filter:brightness(.9)}
 .ios{position:fixed;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));z-index:9;background:var(--nappe);border:1px solid var(--phos);border-radius:4px;padding:12px 44px 12px 14px;font-size:14px;line-height:1.45;box-shadow:0 6px 30px rgba(0,0,0,.6)}
 .ios svg{vertical-align:-3px;margin:0 2px}
 .ios button{position:absolute;top:6px;right:6px;width:32px;height:32px;font:inherit;font-size:18px;color:var(--sourd);background:none;border:0;cursor:pointer}
@@ -136,7 +138,7 @@ footer a{color:var(--texte)}
 </head><body>
 <header>
   <h1>${esc(title)}</h1>
-  <p class="meta">Mis à jour le ${esc(stampFmt.format(new Date(now)))}, rafraîchi toutes les ${every} min. <a href="${esc(feedUrl)}">Flux RSS</a><button type="button" class="install hide" id="inst">Installer l'app</button></p>
+  <p class="meta">Mis à jour le ${esc(stampFmt.format(new Date(now)))}, rafraîchi toutes les ${every} min. <a href="${esc(feedUrl)}">Flux RSS</a><a class="manual" href="https://github.com/Nikoju1977/radar-de-niko/actions/workflows/radar.yml" target="_blank" rel="noopener" title="Ouvrir GitHub Actions puis choisir Run workflow">↻ Mise à jour manuelle</a><button type="button" class="install hide" id="inst">Installer l'app</button></p>
 </header>
 <p class="offline hide" id="off">Hors ligne. Voici la dernière veille reçue, du ${esc(stampFmt.format(new Date(now)))}.</p>
 ${sweep(items, sources, now)}
