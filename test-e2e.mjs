@@ -115,9 +115,9 @@ run.items[0].title = '<script>alert(1)</script> & co';
 const html = toHTML(run);
 ok('page : un <li> par item', (html.match(/<li id=/g) ?? []).length === run.items.length);
 ok('page : titres échappés (pas d\'injection)', !html.includes('<script>alert(1)') && html.includes('&lt;script&gt;'));
-const browserFetches = html.match(/\\bfetch\\(/g) ?? [];
+const browserFetchCount = html.split('fetch(').length - 1;
 ok('page : seul le déclenchement manuel utilise fetch côté navigateur',
-   browserFetches.length === 1 &&
+   browserFetchCount === 1 &&
    html.includes("fetch('https://radar-de-niko-backend-nikoju1977s-projects.vercel.app/api/refresh'") &&
    !/XMLHttpRequest/.test(html));
 ok('page : un seul identifiant par item', new Set(html.match(/<li id="[^"]+"/g)).size === run.items.length);
