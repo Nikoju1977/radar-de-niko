@@ -138,7 +138,7 @@ footer a{color:var(--texte)}
 </head><body>
 <header>
   <h1>${esc(title)}</h1>
-  <p class="meta">Mis à jour le ${esc(stampFmt.format(new Date(now)))}, rafraîchi toutes les ${every} min. <a href="${esc(feedUrl)}">Flux RSS</a><a class="manual" href="https://github.com/Nikoju1977/radar-de-niko/actions/workflows/radar.yml" target="_blank" rel="noopener" title="Ouvrir GitHub Actions puis choisir Run workflow">↻ Mise à jour manuelle</a><button type="button" class="install hide" id="inst">Installer l'app</button></p>
+  <p class="meta">Mis à jour le ${esc(stampFmt.format(new Date(now)))}, rafraîchi toutes les ${every} min. <a href="${esc(feedUrl)}">Flux RSS</a><button type="button" class="manual" id="manual-refresh" title="Lancer une mise à jour immédiate">↻ Mise à jour maintenant</button><button type="button" class="install hide" id="inst">Installer l'app</button></p>
 </header>
 <p class="offline hide" id="off">Hors ligne. Voici la dernière veille reçue, du ${esc(stampFmt.format(new Date(now)))}.</p>
 ${sweep(items, sources, now)}
@@ -160,6 +160,24 @@ ${sweep(items, sources, now)}
   function pick(f){for(var m=0;m<btns.length;m++)btns[m].setAttribute('aria-pressed',btns[m].getAttribute('data-f')===f?'true':'false');apply(f);}
   for(var k=0;k<btns.length;k++)btns[k].addEventListener('click',function(){pick(this.getAttribute('data-f'));});
   var q=/[?&]f=([^&]+)/.exec(location.search); if(q&&document.querySelector('.filters button[data-f="'+decodeURIComponent(q[1])+'"]'))pick(decodeURIComponent(q[1]));
+
+  /* Mise à jour manuelle via backend Vercel, avec repli GitHub */
+  var manual=document.getElementById('manual-refresh');
+  if(manual)manual.addEventListener('click',async function(){
+    var old=manual.textContent;manual.disabled=true;manual.textContent='↻ Lancement…';
+    try{
+      var r=await fetch('https://radar-de-niko-backend-nikoju1977s-projects.vercel.app/api/refresh',{method:'POST',headers:{'Content-Type':'application/json'}});
+      var data={};try{data=await r.json();}catch(e){}
+      if(!r.ok||!data.ok)throw new Error(data.error||('HTTP '+r.status));
+      manual.textContent=data.alreadyRunning?'✓ Mise à jour déjà en cours':'✓ Mise à jour lancée';
+      setTimeout(function(){location.reload();},45000);
+      return;
+    }catch(e){
+      manual.textContent='GitHub →';
+      window.open('https://github.com/Nikoju1977/radar-de-niko/actions/workflows/radar.yml','_blank','noopener');
+      setTimeout(function(){manual.disabled=false;manual.textContent=old;},3000);
+    }
+  });
 
   /* PWA */
   if('serviceWorker' in navigator)window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});
