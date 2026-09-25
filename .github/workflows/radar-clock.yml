@@ -18,17 +18,23 @@ concurrency:
 jobs:
   clock:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - name: Déclencher Radar Auto
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh workflow run radar-auto.yml --repo "${GITHUB_REPOSITORY}" --ref main
+          for tentative in 1 2 3; do
+            if gh workflow run radar-auto.yml --repo "${GITHUB_REPOSITORY}" --ref main; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
 
-      - name: Attendre avant le prochain passage
-        run: sleep 60
+      - name: Attendre 15 minutes
+        run: sleep 900
 
       - name: Réarmer l'horloge
         env:
