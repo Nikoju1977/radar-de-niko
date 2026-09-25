@@ -138,7 +138,7 @@ footer a{color:var(--texte)}
 </head><body>
 <header>
   <h1>${esc(title)}</h1>
-  <p class="meta">Mis à jour le ${esc(stampFmt.format(new Date(now)))}, rafraîchi toutes les ${every} min. <a href="${esc(feedUrl)}">Flux RSS</a><button type="button" class="manual" id="manual-refresh" title="Lancer une mise à jour immédiate">↻ Mise à jour maintenant</button><button type="button" class="install hide" id="inst">Installer l'app</button></p>
+  <p class="meta">Mis à jour le ${esc(stampFmt.format(new Date(now)))}, rafraîchi toutes les ${every} min. <a href="${esc(feedUrl)}">Flux RSS</a><button type="button" class="manual" id="manual-refresh" title="Lancer immédiatement Radar Auto">↻ Mise à jour maintenant</button><button type="button" class="install hide" id="inst">Installer l'app</button></p>
 </header>
 <p class="offline hide" id="off">Hors ligne. Voici la dernière veille reçue, du ${esc(stampFmt.format(new Date(now)))}.</p>
 ${sweep(items, sources, now)}
@@ -174,7 +174,7 @@ ${sweep(items, sources, now)}
       return;
     }catch(e){
       manual.textContent='GitHub →';
-      window.open('https://github.com/Nikoju1977/radar-de-niko/actions/workflows/radar.yml','_blank','noopener');
+      window.open('https://github.com/Nikoju1977/radar-de-niko/actions/workflows/radar-auto.yml','_blank','noopener');
       setTimeout(function(){manual.disabled=false;manual.textContent=old;},3000);
     }
   });
