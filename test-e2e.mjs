@@ -12,7 +12,8 @@ import { runRegistry, toRSS } from './radar-registry.mjs';
 
 let failed = 0;
 const ok = (n, c) => { if (!c) failed++; console.log((c ? '✓' : '✗ ÉCHEC') + ' ' + n); };
-process.on('exit', () => {
+process.on('exit', code => {
+  if (code && !failed) failed = 1;  // un crash n'est jamais « tout vert »
   if (failed) { console.error(`\n${failed} test(s) en échec`); process.exitCode = 1; }
   else console.log('\nchaîne complète : tout vert');
 });
@@ -23,36 +24,43 @@ process.env.TWITTER_BEARER_TOKEN = 'k';
 
 const iso = h => new Date(Date.now() - h * 36e5).toISOString();
 
+const RSS = (items) => `<?xml version="1.0"?><rss><channel>${items.map(i =>
+  `<item><title>${i.t}</title><link>${i.u}</link><pubDate>${new Date(Date.now() - i.h * 36e5).toUTCString()}</pubDate>${i.s ? `<source url="x">${i.s}</source>` : ''}<description>${i.d ?? ''}</description></item>`).join('')}</channel></rss>`;
+const ATOM = (items) => `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">${items.map(i =>
+  `<entry><title>${i.t}</title><link href="${i.u}"/><updated>${iso(i.h)}</updated><author><name>/u/${i.a}</name></author><content type="html">${i.d ?? ''}</content></entry>`).join('')}</feed>`;
+
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
   const reply = body => ({
     ok: true, status: 200, headers: new Map(),
-    json: async () => body, text: async () => ''
+    json: async () => body, text: async () => typeof body === 'string' ? body : JSON.stringify(body)
   });
 
-  if (u.includes('reddit.com')) return reply({ data: { after: null, children: [
-    { data: { title: 'Travaux RN171 à Nozay', url: 'https://ouest-france.fr/rn171?utm_source=reddit',
-              permalink: '/r/nantes/comments/a', created_utc: Date.now() / 1000 - 7200,
-              author: 'local44', selftext: 'Déviation jusqu\'en octobre.', score: 41 } }
-  ] } });
-
+  if (u.includes('news.google.com')) return reply(RSS([
+    { t: 'Châteaubriant : le marché du mercredi déplacé - Ouest-France', u: 'https://www.ouest-france.fr/marche', h: 1, s: 'Ouest-France' }]));
+  if (u.includes('bing.com/news')) return reply(RSS([
+    { t: 'Blain : le château rouvre', u: 'http://www.bing.com/news/apiclick.aspx?url=https%3a%2f%2factu.fr%2fblain-chateau&c=1', h: 2 }]));
+  if (u.includes('actu.fr/l-eclaireur')) return reply(RSS([
+    { t: 'Derval : nouvelle boulangerie', u: 'https://actu.fr/derval-boulangerie', h: 3 }]));
+  if (u.includes('france3-regions')) return reply(RSS([
+    { t: 'Marché de Châteaubriant déplacé', u: 'https://www.ouest-france.fr/marche?utm_source=f3', h: 1 }]));
+  if (u.includes('francebleu') || u.includes('ouest-france.fr/rss') || u.includes('franceinfo.fr')) return reply(RSS([]));
+  if (u.includes('reddit.com/r/nantes')) return reply(ATOM([]));
+  if (u.includes('reddit.com/search.rss')) return reply(ATOM([
+    { t: 'Travaux RN171 à Nozay', u: 'https://www.reddit.com/r/nantes/comments/rn171/', h: 4, a: 'local44', d: '&lt;p&gt;Déviation&lt;/p&gt;' }]));
+  if (u.includes('api.bsky.app')) return reply({ posts: [
+    { uri: 'at://did:plc:x/app.bsky.feed.post/3kabc', author: { handle: 'nantes.bsky.social' },
+      record: { text: 'Grève TAN demain à Nantes\nTrams perturbés', createdAt: iso(1.5) }, likeCount: 4, repostCount: 1 }] });
+  if (u.includes('/api/v1/timelines/tag/')) return reply(u.includes('mastodon.social/api/v1/timelines/tag/nantes') ? [
+    { url: 'https://mastodon.social/@a/1', created_at: iso(2.5), visibility: 'public', reblog: null,
+      content: '<p>Concert gratuit ce soir à <a href="x">#Nantes</a></p>', account: { acct: 'a' }, favourites_count: 2, reblogs_count: 0 }] : []);
   if (u.includes('googleapis.com')) return reply({ items: [
-    { id: { videoId: 'vid1' }, snippet: { title: 'Reportage Châteaubriant',
-      publishedAt: iso(5), channelTitle: 'TéléNantes', description: 'sujet local' } }
-  ] });
-
+    { id: { videoId: 'v1' }, snippet: { title: 'Reportage Ancenis', publishedAt: iso(5), channelTitle: 'TV44', description: 'Ancenis' } }] });
   if (u.includes('api.exa.ai')) return reply({ results: [
-    { title: 'Médiathèque de La Meilleraye-de-Bretagne',
-      url: 'https://actu.fr/mediatheque', publishedDate: iso(3),
-      author: 'actu.fr', text: 'Ouverture samedi.', score: 0.8 },
-    // même article que Reddit, URL polluée différemment : doit fusionner
-    { title: 'Travaux RN171 à Nozay', url: 'https://ouest-france.fr/rn171?fbclid=zz',
-      publishedDate: iso(1), author: 'ouest-france.fr', text: '', score: 0.4 }
-  ] });
-
+    { title: 'La Meilleraye-de-Bretagne inaugure sa médiathèque', url: 'https://actu.fr/meilleraye?fbclid=zz', publishedDate: iso(6), score: 0.8 }] });
   if (u.includes('api.twitter.com')) return reply({
-    data: [{ id: '111', author_id: 'u1', text: 'Budget voirie voté à Châteaubriant',
-             created_at: iso(4), public_metrics: { like_count: 8, retweet_count: 2 } }],
+    data: [{ id: '1', text: 'Conseil municipal de Châteaubriant ce soir', created_at: iso(0.5), author_id: 'u1',
+             public_metrics: { like_count: 3, retweet_count: 1 } }],
     includes: { users: [{ id: 'u1', username: 'ouestfrance44' }] }, meta: {} });
 
   throw new Error('route non simulée : ' + u);
@@ -63,9 +71,9 @@ setReach((platform, opts) => search(platform, opts));
 const run = await runRegistry({ query: 'Loire-Atlantique', since: null });
 const byId = Object.fromEntries(run.reports.map(r => [r.collector.id, r]));
 
-ok('les 4 sources répondent',
-   ['reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa']
-     .every(id => byId[id].status === 'ok'));
+const SRC = ['reach_gnews', 'reach_bing', 'reach_feeds', 'reach_bluesky', 'reach_mastodon',
+             'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'];
+for (const id of SRC) ok(`${id} répond`, byId[id]?.status === 'ok');
 
 ok('aucun item écarté à la normalisation',
    run.reports.every(r => !r.dropped));
@@ -79,8 +87,14 @@ ok('dates valides après mapping',
 ok('URLs absolues après mapping',
    run.items.every(i => /^https?:\/\//.test(i.url)));
 
-ok('doublon inter-sources fusionné (utm vs fbclid)',
-   run.dupes.length === 1 && run.items.filter(i => i.url.includes('rn171')).length === 1);
+ok('doublon inter-sources fusionné (Google News vs flux France 3 avec utm)',
+   run.dupes.length === 1 && run.items.filter(i => i.url.includes('ouest-france.fr/marche')).length === 1);
+
+ok('Bing : lien réel extrait de la redirection', run.items.some(i => i.url === 'https://actu.fr/blain-chateau'));
+ok('Mastodon : HTML retiré du texte', run.items.some(i => i.source === 'mastodon' && !/[<>]/.test(i.title)));
+ok('Bluesky : URL de post reconstruite', run.items.some(i => i.url === 'https://bsky.app/profile/nantes.bsky.social/post/3kabc'));
+ok('Reddit sans clé : lu via Atom', run.items.some(i => i.source === 'reddit' && i.title.includes('RN171')));
+ok('flux presse : nom du journal conservé', run.items.some(i => i.source === 'presse' && i.author === "L'Éclaireur de Châteaubriant"));
 
 ok('enrichissement 44 appliqué',
    run.items.some(i => i.tags?.includes('44')));

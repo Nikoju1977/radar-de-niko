@@ -7,13 +7,14 @@
  * elles-mêmes — seul un run avec clés peut valider ce dernier point.
  */
 
-import { search, missingKeys, parseRSS } from './radar-agent-reach.mjs';
+import { search, missingKeys, parseRSS, resetAuth } from './radar-agent-reach.mjs';
 
 delete process.env.REDDIT_CLIENT_ID; delete process.env.REDDIT_CLIENT_SECRET;
 
 let failed = 0;
 const ok = (n, c) => { if (!c) failed++; console.log((c ? '✓' : '✗ ÉCHEC') + ' ' + n); };
-process.on('exit', () => {
+process.on('exit', code => {
+  if (code && !failed) failed = 1;  // un crash n'est jamais « tout vert »
   if (failed) { console.error(`\n${failed} test(s) en échec`); process.exitCode = 1; }
   else console.log('\nadaptateur : tout vert');
 });
@@ -48,7 +49,9 @@ const env = (k, v) => { if (v === null) delete process.env[k]; else process.env[
 
 /* ─── Reddit ─────────────────────────────────────────────── */
 
-mockFetch([['reddit.com/search.json', (url, init, n) => ({
+env('REDDIT_CLIENT_ID', 'cid'); env('REDDIT_CLIENT_SECRET', 'sec');
+mockFetch([['/api/v1/access_token', () => ({ body: { access_token: 'T', expires_in: 3600 } })],
+           ['oauth.reddit.com/search', (url, init, n) => ({
   headers: {},
   body: n === 1
     ? { data: { after: 't3_page2', children: [
@@ -67,16 +70,17 @@ mockFetch([['reddit.com/search.json', (url, init, n) => ({
 })]]);
 
 let r = await search('reddit', { query: 'Blain', limit: 10 });
-ok('reddit : pagination suivie (2 appels)', calls.length === 2);
+ok('reddit : pagination suivie (2 appels)', calls.filter(c => c.url.includes('oauth.reddit.com')).length === 2);
 ok('reddit : 3 items récupérés', r.length === 3);
 ok('reddit : URL externe conservée', r[0].url === 'https://ouest-france.fr/a');
 ok('reddit : permalink reconstruit en absolu',
    r[1].url === 'https://www.reddit.com/r/nantes/comments/b');
 ok('reddit : auteur préfixé u/', r[0].author === 'u/local44');
-ok('reddit : raw_json demandé', calls[0].url.includes('raw_json=1'));
+ok('reddit : raw_json demandé', calls.find(c => c.url.includes('oauth.reddit.com')).url.includes('raw_json=1'));
 
 r = await search('reddit', { query: 'Blain', since: '2026-01-01', limit: 10 });
 ok('reddit : coupure sur since', r.every(i => i.created_utc >= 1767225600));
+env('REDDIT_CLIENT_ID', null); env('REDDIT_CLIENT_SECRET', null);
 
 /* ─── YouTube ────────────────────────────────────────────── */
 
@@ -159,16 +163,25 @@ ok('401 : pas de reprise inutile', calls.length === 1 && /HTTP 401/.test(threw ?
 /* ─── Façade ─────────────────────────────────────────────── */
 
 threw = null;
-try { await search('mastodon', {}); } catch (e) { threw = e.message; }
+try { await search('myspace', {}); } catch (e) { threw = e.message; }
 ok('plateforme inconnue rejetée', /inconnue/.test(threw ?? ''));
 
 restore();
 
-/* ─── Reddit : OAuth applicatif et diagnostic 403 ─────────────── */
-mockFetch([['reddit.com/search.json', () => ({ status: 403, body: 'blocked' })]]);
-try { await search('reddit', { query: 'x', limit: 5 }); ok('reddit 403 anonyme : erreur attendue', false); }
-catch (e) { ok('reddit 403 anonyme : message actionnable', /REDDIT_CLIENT_ID/.test(e.message)); }
+/* ─── Reddit sans clé : flux Atom ─────────────────────────────── */
+mockFetch([['reddit.com/search.rss', () => ({ body: null })]]);
+globalThis.fetch = (orig => async (u, i) => { const x = await orig(u, i); x.text = async () =>
+  `<feed><entry><title>RN171 fermée</title><link href="https://www.reddit.com/r/nantes/comments/q/"/>` +
+  `<updated>2026-09-24T08:00:00+00:00</updated><author><name>/u/local44</name></author>` +
+  `<content type="html">&lt;p&gt;Déviation&lt;/p&gt;</content></entry></feed>`; return x; })(globalThis.fetch);
+r = await search('reddit', { query: 'RN171', limit: 5 });
+ok('reddit sans clé : Atom parsé', r.length === 1 && r[0].title === 'RN171 fermée');
+ok('reddit sans clé : auteur u/ normalisé', r[0].author === 'u/local44');
+ok('reddit sans clé : texte sans HTML', r[0].selftext === 'Déviation');
+ok('reddit sans clé : aucun appel JSON anonyme', !calls.some(c => c.url.includes('search.json')));
+globalThis.fetch = realFetch;
 
+resetAuth();
 process.env.REDDIT_CLIENT_ID = 'cid'; process.env.REDDIT_CLIENT_SECRET = 'sec';
 mockFetch([
   ['/api/v1/access_token', (u, init) => ({ body: {

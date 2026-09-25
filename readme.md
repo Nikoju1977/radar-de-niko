@@ -46,7 +46,11 @@ Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`.
 | Source | Variable(s) | Sans clé |
 |---|---|---|
 | Google News (RSS) | aucune | fonctionne partout |
-| Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (optionnels) | JSON public — refusé (403) depuis les IP GitHub Actions |
+| Bing News (RSS) | aucune | fonctionne partout |
+| Presse locale & nationale (`radar-sources.json`) | aucune | L'Éclaireur de Châteaubriant, France 3 PDL, ICI Loire Océan, Ouest-France, franceinfo, r/nantes |
+| Bluesky (API publique) | aucune | fonctionne partout |
+| Mastodon (fils par hashtag, instances et tags dans `radar-sources.json`) | aucune | fonctionne partout |
+| Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (optionnels) | flux Atom de recherche — fonctionne depuis GitHub Actions |
 | YouTube | `YOUTUBE_API_KEY` | ignorée |
 | Exa | `EXA_API_KEY` | ignorée |
 | Twitter / X | `TWITTER_BEARER_TOKEN` (API v2 recent search, offre payante) | ignorée |
@@ -57,9 +61,10 @@ Une source sans clé est écartée avant le run, pas comptée en échec.
 ## CI (`.github/workflows/radar.yml`)
 
 - `push` sur `main` : syntaxe, 3 suites de tests, run stub, validation RSS.
-- Chaque jour à 6 h UTC + déclenchement manuel (requête, sources, date plancher) :
+- Toutes les 30 minutes + déclenchement manuel (requête, sources, date plancher) :
   run réel avec les secrets du dépôt, digest dans le résumé du run,
   `radar.xml` / `radar.jsonl` / `radar.md` en artefact `radar`.
+- Mémoire de 14 jours entre runs (cache Actions) : chaque item jamais vu est marqué 🆕 et remonte en tête du digest.
 - Code de sortie 3 si aucune source n'a pu tourner.
 
 ## Garanties vérifiées
@@ -71,6 +76,11 @@ Une source sans clé est écartée avant le run, pas comptée en échec.
 - L'enrichissement 44 tourne dès qu'une source a produit, même si d'autres échouent ou sont filtrées
 - Déduplication par URL canonique (UTM, fbclid, gclid, fragment, slash final)
 - Échappement XML des titres dans le flux RSS
+
+## Ajouter une source gratuite
+
+Un flux RSS/Atom : une ligne dans `radar-sources.json`. Un hashtag Mastodon : une entrée dans `mastodon.tags`.
+Sources testées et **refusées** depuis GitHub Actions (sept. 2026) : GDELT (429), Presse Océan (403), RSSHub public (403).
 
 ## Tests
 

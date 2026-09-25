@@ -1,0 +1,15 @@
+{
+  "_doc": "Flux fixes lus à chaque run (RSS ou Atom, gratuits, sans clé). Ajouter une ligne = ajouter une source. Tous vérifiés HTTP 200 depuis GitHub Actions le 2026-09-25.",
+  "feeds": [
+    { "name": "L'Éclaireur de Châteaubriant", "url": "https://actu.fr/l-eclaireur-de-chateaubriant/rss.xml" },
+    { "name": "France 3 Pays de la Loire",   "url": "https://france3-regions.franceinfo.fr/pays-de-la-loire/rss" },
+    { "name": "ICI Loire Océan",             "url": "https://www.francebleu.fr/rss/loire-ocean/a-la-une.xml" },
+    { "name": "Ouest-France · À la une",     "url": "https://www.ouest-france.fr/rss/une" },
+    { "name": "franceinfo · Titres",         "url": "https://www.franceinfo.fr/titres.rss" },
+    { "name": "Reddit r/nantes",             "url": "https://www.reddit.com/r/nantes/new/.rss" }
+  ],
+  "mastodon": {
+    "instances": ["mastodon.social", "piaille.fr"],
+    "tags": ["nantes", "loireatlantique", "chateaubriant"]
+  }
+}

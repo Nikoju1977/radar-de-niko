@@ -320,14 +320,14 @@ ${entries}
 
 export const toJSONL = items => items.map(i => JSON.stringify(i)).join('\n') + '\n';
 
-export function toDigest({ items, reports, dupes }) {
+export function toDigest({ items, reports, dupes, fresh }) {
   const bySource = new Map();
   for (const i of items) bySource.set(i.source, (bySource.get(i.source) ?? 0) + 1);
 
   const lines = [
     `# Radar — ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
     '',
-    `${items.length} items retenus · ${dupes.length} doublons fusionnés`,
+    `${items.length} items retenus · ${dupes.length} doublons fusionnés${fresh != null ? ` · ${fresh} nouveau(x) depuis le run précédent` : ''}`,
     '',
     '## Collecte',
     ...reports.map(r => {
@@ -343,8 +343,8 @@ export function toDigest({ items, reports, dupes }) {
     ...[...bySource.entries()].map(([s, n]) => `- ${s} : ${n}`),
     '',
     '## Items',
-    ...items.slice(0, 40).map(i =>
-      `- [${i.source}]${i.tags?.length ? ' ' + i.tags.map(t => `#${t}`).join(' ') : ''} ${i.title}\n  ${i.url}\n  ${i.publishedAt}`)
+    ...[...items].sort((a, b) => (b.new === true) - (a.new === true)).slice(0, 60).map(i =>
+      `- ${i.new ? '🆕 ' : ''}[${i.source}]${i.tags?.length ? ' ' + i.tags.map(t => `#${t}`).join(' ') : ''} ${i.title}\n  ${i.url}\n  ${i.publishedAt}`)
   ];
   return lines.join('\n') + '\n';
 }

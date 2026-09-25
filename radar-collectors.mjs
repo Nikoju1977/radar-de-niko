@@ -116,6 +116,54 @@ defineCollector({
   }
 });
 
+defineCollector({
+  id: 'reach_bing', name: 'Bing News', source: 'bing', version: '1.0', retries: 2,
+  collect: async ({ query, since, signal }) => {
+    const raw = await reach('bing', { query, since, limit: 40, signal });
+    return raw.map(n => ({
+      title: n.title, url: n.url, author: n.source, summary: n.description,
+      publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null
+    }));
+  }
+});
+
+defineCollector({
+  id: 'reach_feeds', name: 'Presse locale & nationale (flux)', source: 'presse', version: '1.0',
+  timeout: 40000, retries: 1,
+  collect: async ({ query, since, signal, log }) => {
+    const raw = await reach('feeds', { query, since, limit: 300, signal });
+    if (raw.failedFeeds?.length) log?.(`flux en échec : ${raw.failedFeeds.join(' ; ')}`);
+    return raw.map(n => ({
+      title: n.title, url: n.url, author: n.feed, summary: n.description,
+      publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null
+    }));
+  }
+});
+
+defineCollector({
+  id: 'reach_bluesky', name: 'Bluesky', source: 'bluesky', version: '1.0', retries: 2,
+  collect: async ({ query, since, signal }) => {
+    const raw = await reach('bluesky', { query, since, limit: 50, signal });
+    return raw.map(p => ({
+      title: p.text.split('\n')[0].slice(0, 180), url: p.url, publishedAt: p.createdAt,
+      author: p.handle, summary: p.text, score: p.likeCount + 2 * p.repostCount
+    }));
+  }
+});
+
+defineCollector({
+  id: 'reach_mastodon', name: 'Mastodon', source: 'mastodon', version: '1.0', retries: 1,
+  collect: async ({ query, since, signal }) => {
+    const raw = await reach('mastodon', { query, since, limit: 60, signal });
+    return raw.map(p => ({
+      title: p.text.slice(0, 180), url: p.url, publishedAt: p.createdAt,
+      author: p.acct, summary: p.text, score: p.favourites + 2 * p.reblogs
+    }));
+  }
+});
+
+const SOURCES = ['reach_gnews', 'reach_bing', 'reach_feeds', 'reach_bluesky', 'reach_mastodon', 'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'];
+
 /* ─── Collecteur dépendant : ne tourne qu'après les sources ──── */
 
 defineCollector({
@@ -124,10 +172,10 @@ defineCollector({
   source: 'radar',
   version: '2.0',
   mode: 'enrich',                       // patche les items retenus, n'en crée aucun
-  requires: ['reach_gnews', 'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'],
+  requires: SOURCES,
   collect: ({ results }) => {
-    const TERMS = /(loire-atlantique|nantes|châteaubriant|chateaubriant|ancenis|blain|nozay|meilleraye|derval|guémené|guemene|\b44\b)/i;
-    const pool = ['reach_gnews', 'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa']
+    const TERMS = /(loire[- ]atlantique|nantes|nantais|saint-nazaire|châteaubriant|chateaubriant|ancenis|blain|nozay|meilleraye|derval|guémené|guemene|moisdon|issé|erbray|rougé|sion-les-mines|saffré|héric|clisson|pornic|la baule|guérande|#?loireatlantique|\b44\b)/i;
+    const pool = SOURCES
       .flatMap(id => results.get(id)?.items ?? []);
 
     return pool

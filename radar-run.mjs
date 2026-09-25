@@ -32,6 +32,7 @@ const query = arg('query', 'Châteaubriant Loire-Atlantique');
 const since = arg('since');
 const outDir = arg('out', './dist');
 const only = arg('only');
+const statePath = arg('state');   // mémoire entre runs : marque les items jamais vus
 
 /* ─── Branchement d'Agent Reach ──────────────────────────────── */
 
@@ -100,6 +101,24 @@ try {
 } catch (e) {
   console.error(e.message);
   process.exit(2);
+}
+
+/* ─── Nouveautés depuis le run précédent ─────────────────────── */
+if (statePath) {
+  let seen = {};
+  try { seen = JSON.parse(await readFile(statePath, 'utf8')).seen ?? {}; } catch { /* premier run */ }
+  const first = !Object.keys(seen).length;
+  const nowIso = new Date().toISOString();
+  for (const i of run.items) {
+    i.new = !first && !seen[i.id];
+    seen[i.id] ??= nowIso;
+  }
+  const keep = Date.now() - 14 * 864e5;   // mémoire de 14 jours
+  for (const [id, t] of Object.entries(seen)) if (Date.parse(t) < keep) delete seen[id];
+  const { dirname } = await import('node:path');
+  await mkdir(dirname(statePath), { recursive: true });
+  await writeFile(statePath, JSON.stringify({ updated: nowIso, seen }));
+  run.fresh = run.items.filter(i => i.new).length;
 }
 
 await mkdir(outDir, { recursive: true });

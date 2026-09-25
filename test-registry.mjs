@@ -1,7 +1,9 @@
 import { defineCollector, resetRegistry, validate, runRegistry, toRSS, levels } from './radar-registry.mjs';
 let failed=0;
 const ok=(n,c)=>{ if(!c) failed++; console.log((c?'✓':'✗ ÉCHEC')+' '+n); };
-process.on('exit',()=>{ if(failed){ console.error(`\n${failed} test(s) en échec`); process.exitCode=1; } else console.log('\nnoyau : tout vert'); });
+process.on('exit', code => {
+  if (code && !failed) failed = 1; /* un crash n est jamais tout vert */
+  if(failed){ console.error(`\n${failed} test(s) en échec`); process.exitCode=1; } else console.log('\nnoyau : tout vert'); });
 
 // 1. cycle
 resetRegistry();

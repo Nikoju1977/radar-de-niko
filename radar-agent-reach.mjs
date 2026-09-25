@@ -85,6 +85,8 @@ const toEpoch = since => since ? Math.floor(new Date(since).getTime() / 1000) : 
 
 /** Jeton applicatif Reddit (client_credentials), mis en cache jusqu'à expiration. */
 let redditToken = null;
+/** Vide le cache d'authentification (tests, rotation de clés). */
+export const resetAuth = () => { redditToken = null; };
 async function redditAuth(signal) {
   const id = process.env.REDDIT_CLIENT_ID, secret = process.env.REDDIT_CLIENT_SECRET;
   if (!id || !secret) return null;
@@ -102,12 +104,28 @@ async function redditAuth(signal) {
   return redditToken.value;
 }
 
-/** Reddit — OAuth si clés, sinon JSON public. Pagination par curseur `after`. */
+/** Reddit sans clé — flux Atom de recherche, accepté depuis GitHub Actions. */
+async function redditRSS({ query, since, limit = 50, signal }) {
+  const u = new URL('https://www.reddit.com/search.rss');
+  u.searchParams.set('q', query); u.searchParams.set('sort', 'new'); u.searchParams.set('limit', String(Math.min(100, limit)));
+  const xml = await request(u.toString(), { signal, accept: FEED_ACCEPT, as: 'text' });
+  return recent(parseRSS(xml), since).slice(0, limit).map(e => ({
+    title: e.title,
+    url: e.url,
+    created_utc: e.pubDate ? Date.parse(e.pubDate) / 1000 : null,
+    author: e.source ? `u/${e.source.replace(/^\/?u\//, '')}` : null,
+    selftext: e.description,
+    score: null
+  }));
+}
+
+/** Reddit — OAuth si clés, sinon flux Atom. Pagination par curseur `after`. */
 async function reddit({ query, since, limit = 50, signal }) {
   const cut = toEpoch(since);
   const out = [];
   let after = null;
   const token = await redditAuth(signal);
+  if (!token) return redditRSS({ query, since, limit, signal });
   const base = token ? 'https://oauth.reddit.com/search' : 'https://www.reddit.com/search.json';
   const headers = token ? { authorization: `Bearer ${token}` } : {};
 
@@ -260,7 +278,19 @@ const strip = h => decode(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(
 const tag = (xml, name) => xml.match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`, 'i'))?.[1] ?? null;
 
 export function parseRSS(xml) {
-  return [...String(xml).matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(([, it]) => {
+  const src = String(xml);
+  // Atom (Reddit, YouTube…) : <entry> avec <link href="…"/>
+  if (!/<item\b/i.test(src) && /<entry\b/i.test(src)) {
+    return [...src.matchAll(/<entry\b[^>]*>([\s\S]*?)<\/entry>/gi)].map(([, e]) => ({
+      title: strip(tag(e, 'title')),
+      url: decode(e.match(/<link\b[^>]*rel=["']alternate["'][^>]*href=["']([^"']+)/i)?.[1]
+                ?? e.match(/<link\b[^>]*href=["']([^"']+)/i)?.[1] ?? '') || null,
+      pubDate: decode(tag(e, 'published') ?? tag(e, 'updated')).trim() || null,
+      source: strip(tag(tag(e, 'author') ?? '', 'name')) || null,
+      description: strip(tag(e, 'content') ?? tag(e, 'summary')).slice(0, 800) || null
+    }));
+  }
+  return [...src.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(([, it]) => {
     const source = strip(tag(it, 'source'));
     let title = strip(tag(it, 'title'));
     if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -source.length - 3);
@@ -282,15 +312,101 @@ async function gnews({ query, since, limit = 50, signal }) {
   return parseRSS(xml).slice(0, limit);
 }
 
+const FEED_ACCEPT = 'application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.5';
+const cutoff = since => since ? new Date(since).getTime() : 0;
+const recent = (items, since) => items.filter(i => !since || !i.pubDate || Date.parse(i.pubDate) >= cutoff(since));
+
+/** Bing News — RSS de recherche, sans clé. */
+async function bing({ query, since, limit = 40, signal }) {
+  const u = new URL('https://www.bing.com/news/search');
+  u.searchParams.set('q', query); u.searchParams.set('format', 'rss');
+  u.searchParams.set('setlang', 'fr'); u.searchParams.set('cc', 'FR'); u.searchParams.set('qft', 'sortbydate="1"');
+  const xml = await request(u.toString(), { signal, accept: FEED_ACCEPT, as: 'text' });
+  return recent(parseRSS(xml), since).slice(0, limit).map(i => ({
+    ...i,
+    // Bing encapsule le lien réel dans un paramètre url=
+    url: (() => { try { return new URL(i.url).searchParams.get('url') || i.url; } catch { return i.url; } })()
+  }));
+}
+
+/** Flux fixes (radar-sources.json) — lus en parallèle, un flux mort n'emporte pas les autres. */
+let sourcesCfg = null;
+export async function loadSources() {
+  if (sourcesCfg) return sourcesCfg;
+  const { readFile } = await import('node:fs/promises');
+  sourcesCfg = JSON.parse(await readFile(new URL('./radar-sources.json', import.meta.url), 'utf8'));
+  return sourcesCfg;
+}
+export function setSources(cfg) { sourcesCfg = cfg; }
+
+async function feeds({ since, limit = 200, signal }) {
+  const { feeds: list = [] } = await loadSources();
+  const settled = await Promise.allSettled(list.map(async f => {
+    const xml = await request(f.url, { signal, accept: FEED_ACCEPT, as: 'text', retries: 1 });
+    return parseRSS(xml).map(i => ({ ...i, source: i.source && !/^\/?u\//.test(i.source) ? i.source : f.name,
+                                     author: i.source, feed: f.name }));
+  }));
+  const failed = settled.map((s, i) => s.status === 'rejected' ? `${list[i].name} (${s.reason?.message ?? s.reason})` : null).filter(Boolean);
+  if (failed.length === list.length && list.length) throw new Error(`tous les flux en échec : ${failed.join(' ; ')}`);
+  const out = settled.flatMap(s => s.status === 'fulfilled' ? s.value : []);
+  out.failedFeeds = failed;
+  return recent(out, since).slice(0, limit);
+}
+
+/** Bluesky — API publique AppView, sans compte. */
+async function bluesky({ query, since, limit = 50, signal }) {
+  const u = new URL('https://api.bsky.app/xrpc/app.bsky.feed.searchPosts');
+  u.searchParams.set('q', query); u.searchParams.set('sort', 'latest');
+  u.searchParams.set('limit', String(Math.min(100, limit)));
+  if (since) u.searchParams.set('since', new Date(since).toISOString());
+  const json = await request(u.toString(), { signal });
+  return (json.posts ?? []).map(p => {
+    const rkey = String(p.uri ?? '').split('/').pop();
+    return {
+      text: p.record?.text ?? '',
+      url: p.author?.handle && rkey ? `https://bsky.app/profile/${p.author.handle}/post/${rkey}` : null,
+      createdAt: p.record?.createdAt ?? p.indexedAt,
+      handle: p.author?.handle ?? null,
+      likeCount: p.likeCount ?? 0,
+      repostCount: p.repostCount ?? 0
+    };
+  });
+}
+
+/** Mastodon — fils publics par hashtag, sans compte, sur plusieurs instances. */
+const slugTag = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+async function mastodon({ query, since, limit = 60, signal }) {
+  const cfg = (await loadSources()).mastodon ?? {};
+  const instances = cfg.instances ?? ['mastodon.social'];
+  const tags = [...new Set([...(cfg.tags ?? []), slugTag(query.replace(/\s+/g, ''))].filter(Boolean))];
+  const jobs = instances.flatMap(host => tags.map(t => ({ host, t })));
+  const settled = await Promise.allSettled(jobs.map(({ host, t }) =>
+    request(`https://${host}/api/v1/timelines/tag/${encodeURIComponent(t)}?limit=40`, { signal, retries: 1 })));
+  if (jobs.length && settled.every(s => s.status === 'rejected')) throw settled[0].reason;
+  const html = h => strip(h);
+  const out = settled.flatMap(s => s.status === 'fulfilled' && Array.isArray(s.value) ? s.value : [])
+    .filter(st => !st.reblog && st.visibility === 'public')
+    .map(st => ({
+      text: html(st.content),
+      url: st.url ?? st.uri,
+      createdAt: st.created_at,
+      acct: st.account?.acct ?? null,
+      favourites: st.favourites_count ?? 0,
+      reblogs: st.reblogs_count ?? 0
+    }));
+  return out.filter(i => !since || Date.parse(i.createdAt) >= cutoff(since))
+            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, limit);
+}
+
 /* ═══════════════════════════════════════════════════════════
    Façade
    ═══════════════════════════════════════════════════════════ */
 
-const PLATFORMS = { gnews, reddit, youtube, exa, twitter };
+const PLATFORMS = { gnews, bing, feeds, bluesky, mastodon, reddit, youtube, exa, twitter };
 
 /** Clés obligatoires par plateforme (Reddit : aucune, OAuth optionnel). */
 const REQUIRED = {
-  gnews: [],
+  gnews: [], bing: [], feeds: [], bluesky: [], mastodon: [],
   reddit: [],
   youtube: ['YOUTUBE_API_KEY'],
   exa: ['EXA_API_KEY'],
