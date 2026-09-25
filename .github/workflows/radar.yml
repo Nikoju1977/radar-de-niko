@@ -12,9 +12,6 @@ on:
       since:
         description: Date plancher ISO (ex. 2026-09-01) — optionnel
         default: ''
-  schedule:
-    # Toutes les 15 min, décalé des pics de charge du début d'heure.
-    - cron: '7,22,37,52 * * * *'
   push:
     branches: [main]
 
@@ -24,8 +21,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: radar-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: radar-pages
+  cancel-in-progress: false
 
 jobs:
   tests:
@@ -47,7 +44,7 @@ jobs:
   veille:
     runs-on: ubuntu-latest
     needs: tests
-    if: always() && (github.event_name == 'schedule' || needs.tests.result == 'success')
+    if: always() && needs.tests.result == 'success'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
