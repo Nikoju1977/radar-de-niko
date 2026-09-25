@@ -20,6 +20,7 @@ try {
 } catch { /* pas de .env : normal en CI */ }
 import { runRegistry, toRSS, toJSONL, toDigest, allCollectors } from './radar-registry.mjs';
 import { setReach } from './radar-collectors.mjs';
+import { toHTML } from './radar-page.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback = null) => {
@@ -125,6 +126,7 @@ await mkdir(outDir, { recursive: true });
 await writeFile(`${outDir}/radar.xml`, toRSS(run.items));
 await writeFile(`${outDir}/radar.jsonl`, toJSONL(run.items));
 await writeFile(`${outDir}/radar.md`, toDigest(run));
+await writeFile(`${outDir}/index.html`, toHTML(run, { every: Number(arg('every', 15)) }));
 
 console.log(toDigest(run));
 

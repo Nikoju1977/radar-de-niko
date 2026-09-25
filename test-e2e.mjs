@@ -9,6 +9,7 @@
 import { search } from './radar-agent-reach.mjs';
 import { setReach } from './radar-collectors.mjs';
 import { runRegistry, toRSS } from './radar-registry.mjs';
+import { toHTML } from './radar-page.mjs';
 
 let failed = 0;
 const ok = (n, c) => { if (!c) failed++; console.log((c ? '✓' : '✗ ÉCHEC') + ' ' + n); };
@@ -109,5 +110,12 @@ ok('tri antichronologique',
 const xml = toRSS(run.items);
 ok('flux RSS contient tous les items',
    (xml.match(/<item>/g) ?? []).length === run.items.length);
+
+run.items[0].title = '<script>alert(1)</script> & co';
+const html = toHTML(run);
+ok('page : un <li> par item', (html.match(/<li id=/g) ?? []).length === run.items.length);
+ok('page : titres échappés (pas d\'injection)', !html.includes('<script>alert(1)') && html.includes('&lt;script&gt;'));
+ok('page : aucun fetch/XHR côté navigateur', !/fetch\(|XMLHttpRequest/.test(html));
+ok('page : un seul identifiant par item', new Set(html.match(/<li id="[^"]+"/g)).size === run.items.length);
 
 console.log(`\n${run.items.length} items, ${run.dupes.length} doublon(s) fusionné(s)`);

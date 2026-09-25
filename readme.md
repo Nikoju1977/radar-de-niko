@@ -1,5 +1,7 @@
 # Radar de Niko — noyau de collecte
 
+**Veille en direct :** https://nikoju1977.github.io/radar-de-niko/ · **Flux RSS :** https://nikoju1977.github.io/radar-de-niko/radar.xml · **JSONL :** https://nikoju1977.github.io/radar-de-niko/radar.jsonl
+
 Registre de collecteurs pour la veille Journal 44, transposé du pattern de plugins d'ALEAPP.
 
 ## Principe
@@ -30,6 +32,8 @@ Ajouter une source = ajouter un `defineCollector()`. Rien d'autre à toucher.
 | `radar-collectors.mjs` | Un bloc par source (Google News, Twitter, Reddit, YouTube, Exa, pertinence 44) |
 | `radar-agent-reach.mjs` | Clients HTTP des plateformes (reprises, OAuth Reddit, parseur RSS) |
 | `radar-run.mjs` | Point d'entrée CLI |
+| `radar-page.mjs` | Page publique statique (balayage 24 h, filtres) |
+| `radar-sources.json` | Flux RSS fixes et hashtags Mastodon |
 
 ## Utilisation
 
@@ -61,9 +65,9 @@ Une source sans clé est écartée avant le run, pas comptée en échec.
 ## CI (`.github/workflows/radar.yml`)
 
 - `push` sur `main` : syntaxe, 3 suites de tests, run stub, validation RSS.
-- Toutes les 30 minutes + déclenchement manuel (requête, sources, date plancher) :
+- Toutes les 15 minutes + déclenchement manuel (requête, sources, date plancher) :
   run réel avec les secrets du dépôt, digest dans le résumé du run,
-  `radar.xml` / `radar.jsonl` / `radar.md` en artefact `radar`.
+  `radar.xml` / `radar.jsonl` / `radar.md` / `index.html` en artefact `radar`, puis publiés sur GitHub Pages.
 - Mémoire de 14 jours entre runs (cache Actions) : chaque item jamais vu est marqué 🆕 et remonte en tête du digest.
 - Code de sortie 3 si aucune source n'a pu tourner.
 
