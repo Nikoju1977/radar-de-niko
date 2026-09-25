@@ -1,0 +1,44 @@
+name: Radar Clock
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/radar-clock.yml'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: radar-clock
+  cancel-in-progress: true
+
+jobs:
+  clock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Déclencher Radar Auto
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run radar-auto.yml --repo "${GITHUB_REPOSITORY}" --ref main
+
+      - name: Attendre avant le prochain passage
+        run: sleep 60
+
+      - name: Réarmer l'horloge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for tentative in 1 2 3; do
+            if gh workflow run radar-clock.yml --repo "${GITHUB_REPOSITORY}" --ref main; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
