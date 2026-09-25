@@ -222,3 +222,23 @@ r = await search('gnews', { query: 'Nozay', since: '2026-09-01', limit: 10 });
 ok('gnews : items récupérés sans clé', r.length === 2);
 ok('gnews : paramètres FR + filtre after:', /hl=fr/.test(calls[0].url) && /after%3A2026-09-01/.test(calls[0].url));
 globalThis.fetch = realFetch;
+
+/* ─── Bluesky : repli entre endpoints, puis compte ───────────── */
+resetAuth(); delete process.env.BSKY_HANDLE; delete process.env.BSKY_APP_PASSWORD;
+const POST = { posts: [{ uri: 'at://did:plc:x/app.bsky.feed.post/3kz', author: { handle: 'a.bsky.social' },
+  record: { text: 'Nantes', createdAt: '2026-09-24T08:00:00Z' }, likeCount: 1, repostCount: 0 }] };
+mockFetch([['api.bsky.app/xrpc', (u) => u.startsWith('https://api.bsky.app') ? { status: 403, body: 'waf' } : { body: POST }]]);
+r = await search('bluesky', { query: 'Nantes' });
+ok('bluesky : 403 sur api → repli public.api', r.length === 1 && calls.some(c => c.url.startsWith('https://public.api.bsky.app')));
+
+mockFetch([['bsky.app/xrpc', () => ({ status: 403, body: 'waf' })]]);
+threw = null; try { await search('bluesky', { query: 'x' }); } catch (e) { threw = e.message; }
+ok('bluesky : double 403 → message actionnable', /BSKY_APP_PASSWORD/.test(threw ?? ''));
+
+process.env.BSKY_HANDLE = 'moi.bsky.social'; process.env.BSKY_APP_PASSWORD = 'xxxx';
+mockFetch([['createSession', (u, i) => ({ body: JSON.parse(i.body).password === 'xxxx' ? { accessJwt: 'J' } : {} })],
+           ['bsky.social/xrpc/app.bsky.feed.searchPosts', (u, i) => i.headers.authorization === 'Bearer J' ? { body: POST } : { status: 401 }]]);
+r = await search('bluesky', { query: 'Nantes' });
+ok('bluesky : compte gratuit authentifié', r.length === 1 && !calls.some(c => c.url.includes('api.bsky.app')));
+delete process.env.BSKY_HANDLE; delete process.env.BSKY_APP_PASSWORD; resetAuth();
+globalThis.fetch = realFetch;

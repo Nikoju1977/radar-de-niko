@@ -48,7 +48,7 @@ Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`.
 | Google News (RSS) | aucune | fonctionne partout |
 | Bing News (RSS) | aucune | fonctionne partout |
 | Presse locale & nationale (`radar-sources.json`) | aucune | L'Éclaireur de Châteaubriant, France 3 PDL, ICI Loire Océan, Ouest-France, franceinfo, r/nantes |
-| Bluesky (API publique) | aucune | fonctionne partout |
+| Bluesky | `BSKY_HANDLE`, `BSKY_APP_PASSWORD` (optionnels, compte gratuit) | API publique, deux endpoints en repli — 403 intermittent depuis certaines IP GitHub |
 | Mastodon (fils par hashtag, instances et tags dans `radar-sources.json`) | aucune | fonctionne partout |
 | Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (optionnels) | flux Atom de recherche — fonctionne depuis GitHub Actions |
 | YouTube | `YOUTUBE_API_KEY` | ignorée |

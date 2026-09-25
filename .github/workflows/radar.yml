@@ -63,6 +63,8 @@ jobs:
           TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
           QUERY: ${{ github.event.inputs.query || 'Châteaubriant Loire-Atlantique' }}
           ONLY: ${{ github.event.inputs.only }}
           SINCE: ${{ github.event.inputs.since }}

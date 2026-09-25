@@ -86,7 +86,7 @@ const toEpoch = since => since ? Math.floor(new Date(since).getTime() / 1000) : 
 /** Jeton applicatif Reddit (client_credentials), mis en cache jusqu'à expiration. */
 let redditToken = null;
 /** Vide le cache d'authentification (tests, rotation de clés). */
-export const resetAuth = () => { redditToken = null; };
+export const resetAuth = () => { redditToken = null; bskySession = null; };
 async function redditAuth(signal) {
   const id = process.env.REDDIT_CLIENT_ID, secret = process.env.REDDIT_CLIENT_SECRET;
   if (!id || !secret) return null;
@@ -353,13 +353,41 @@ async function feeds({ since, limit = 200, signal }) {
   return recent(out, since).slice(0, limit);
 }
 
-/** Bluesky — API publique AppView, sans compte. */
+/** Session Bluesky (compte gratuit + mot de passe d'application), mise en cache. */
+let bskySession = null;
+async function bskyAuth(signal) {
+  const id = process.env.BSKY_HANDLE, pw = process.env.BSKY_APP_PASSWORD;
+  if (!id || !pw) return null;
+  if (bskySession && bskySession.exp > Date.now()) return bskySession.jwt;
+  const json = await request('https://bsky.social/xrpc/com.atproto.server.createSession', {
+    method: 'POST', signal, headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ identifier: id, password: pw })
+  });
+  if (!json?.accessJwt) throw new Error('session Bluesky refusée');
+  bskySession = { jwt: json.accessJwt, exp: Date.now() + 60 * 60e3 };
+  return bskySession.jwt;
+}
+
+/**
+ * Bluesky — compte gratuit si BSKY_HANDLE + BSKY_APP_PASSWORD, sinon AppView publique.
+ * Les endpoints publics filtrent une partie des IP de datacenter (403 intermittent) :
+ * on les essaie tour à tour.
+ */
 async function bluesky({ query, since, limit = 50, signal }) {
-  const u = new URL('https://api.bsky.app/xrpc/app.bsky.feed.searchPosts');
-  u.searchParams.set('q', query); u.searchParams.set('sort', 'latest');
-  u.searchParams.set('limit', String(Math.min(100, limit)));
-  if (since) u.searchParams.set('since', new Date(since).toISOString());
-  const json = await request(u.toString(), { signal });
+  const params = new URLSearchParams({ q: query, sort: 'latest', limit: String(Math.min(100, limit)) });
+  if (since) params.set('since', new Date(since).toISOString());
+  const jwt = await bskyAuth(signal);
+  const hosts = jwt ? ['https://bsky.social'] : ['https://api.bsky.app', 'https://public.api.bsky.app'];
+  let json = null, lastErr = null;
+  for (const h of hosts) {
+    try {
+      json = await request(`${h}/xrpc/app.bsky.feed.searchPosts?${params}`, {
+        signal, retries: 1, headers: jwt ? { authorization: `Bearer ${jwt}` } : {}
+      });
+      break;
+    } catch (e) { lastErr = e; if (e.status !== 403 && e.status !== 401) throw e; }
+  }
+  if (!json) throw new Error(`Bluesky refuse cette IP (${lastErr?.status ?? '?'}) — renseigner BSKY_HANDLE et BSKY_APP_PASSWORD (compte gratuit)`);
   return (json.posts ?? []).map(p => {
     const rkey = String(p.uri ?? '').split('/').pop();
     return {
