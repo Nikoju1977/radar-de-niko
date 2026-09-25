@@ -224,10 +224,17 @@ export async function runRegistry({ query = '', since = null, filter = null, log
   for (const level of plan) {
     const runnable = [];
     for (const c of level) {
-      const missing = c.requires.filter(d => byId.get(d)?.status !== 'ok');
-      if (missing.length) {
+      // Dépendances hors sélection (--only) : ignorées, elles ne tourneront pas.
+      const deps = c.requires.filter(d => selected.some(x => x.id === d));
+      const missing = deps.filter(d => byId.get(d)?.status !== 'ok');
+      // Un enrichisseur tourne dès qu'au moins une de ses sources a produit :
+      // une source morte ne doit pas priver les autres de l'enrichissement.
+      const blocked = c.mode === 'enrich'
+        ? deps.length === 0 || missing.length === deps.length
+        : missing.length > 0;
+      if (blocked) {
         const r = { collector: c, status: 'skipped',
-                    reason: `dépend de ${missing.join(', ')}`, items: [], patches: [], ms: 0 };
+                    reason: deps.length ? `dépend de ${missing.join(', ')}` : 'aucune source sélectionnée', items: [], patches: [], ms: 0 };
         reports.push(r); byId.set(c.id, r);
       } else {
         runnable.push(c);

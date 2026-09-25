@@ -13,7 +13,10 @@
  *
  * Clés lues dans l'environnement (voir .env.example) :
  *   EXA_API_KEY, YOUTUBE_API_KEY, TWITTER_BEARER_TOKEN
- * Reddit fonctionne sans clé via son endpoint JSON public.
+ *   REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET (optionnels, recommandés)
+ * Reddit : OAuth application si les deux clés sont présentes, sinon endpoint
+ * JSON public — ce dernier est souvent refusé (403) depuis les IP de datacenter
+ * (GitHub Actions, VPS) : en CI, fournir les clés Reddit.
  */
 
 const UA = 'radar-de-niko/1.0 (+https://github.com/Nikoju1977/radar-de-niko)';
@@ -79,21 +82,51 @@ const toEpoch = since => since ? Math.floor(new Date(since).getTime() / 1000) : 
    Clients par plateforme
    ═══════════════════════════════════════════════════════════ */
 
-/** Reddit — endpoint JSON public, sans clé. Pagination par curseur `after`. */
+/** Jeton applicatif Reddit (client_credentials), mis en cache jusqu'à expiration. */
+let redditToken = null;
+async function redditAuth(signal) {
+  const id = process.env.REDDIT_CLIENT_ID, secret = process.env.REDDIT_CLIENT_SECRET;
+  if (!id || !secret) return null;
+  if (redditToken && redditToken.exp > Date.now() + 60e3) return redditToken.value;
+  const json = await request('https://www.reddit.com/api/v1/access_token', {
+    method: 'POST', signal,
+    headers: {
+      authorization: 'Basic ' + Buffer.from(`${id}:${secret}`).toString('base64'),
+      'content-type': 'application/x-www-form-urlencoded'
+    },
+    body: 'grant_type=client_credentials'
+  });
+  if (!json?.access_token) throw new Error(`OAuth Reddit refusé${json?.error ? ` — ${json.error}` : ''}`);
+  redditToken = { value: json.access_token, exp: Date.now() + (json.expires_in ?? 3600) * 1000 };
+  return redditToken.value;
+}
+
+/** Reddit — OAuth si clés, sinon JSON public. Pagination par curseur `after`. */
 async function reddit({ query, since, limit = 50, signal }) {
   const cut = toEpoch(since);
   const out = [];
   let after = null;
+  const token = await redditAuth(signal);
+  const base = token ? 'https://oauth.reddit.com/search' : 'https://www.reddit.com/search.json';
+  const headers = token ? { authorization: `Bearer ${token}` } : {};
 
   while (out.length < limit) {
-    const u = new URL('https://www.reddit.com/search.json');
+    const u = new URL(base);
     u.searchParams.set('q', query);
     u.searchParams.set('sort', 'new');
     u.searchParams.set('limit', String(Math.min(100, limit - out.length)));
     u.searchParams.set('raw_json', '1');
     if (after) u.searchParams.set('after', after);
 
-    const json = await request(u.toString(), { signal });
+    let json;
+    try {
+      json = await request(u.toString(), { signal, headers });
+    } catch (e) {
+      if (e.status === 403 && !token) {
+        throw new Error('Reddit refuse l\'accès anonyme depuis cette IP (403) — renseigner REDDIT_CLIENT_ID et REDDIT_CLIENT_SECRET');
+      }
+      throw e;
+    }
     const children = json?.data?.children ?? [];
     if (!children.length) break;
 
@@ -221,6 +254,18 @@ async function twitter({ query, since, limit = 50, signal }) {
 
 const PLATFORMS = { reddit, youtube, exa, twitter };
 
+/** Clés obligatoires par plateforme (Reddit : aucune, OAuth optionnel). */
+const REQUIRED = {
+  reddit: [],
+  youtube: ['YOUTUBE_API_KEY'],
+  exa: ['EXA_API_KEY'],
+  twitter: ['TWITTER_BEARER_TOKEN']
+};
+
+/** Variables manquantes pour une plateforme — [] si elle peut tourner. */
+export const missingKeys = (platform, env = process.env) =>
+  (REQUIRED[platform] ?? []).filter(k => !env[k]);
+
 export async function search(platform, opts = {}) {
   const fn = PLATFORMS[platform];
   if (!fn) throw new Error(`plateforme inconnue : ${platform}`);
@@ -230,4 +275,4 @@ export async function search(platform, opts = {}) {
 
 export const platforms = () => Object.keys(PLATFORMS);
 export { request, HttpError };
-export default { search, platforms };
+export default { search, platforms, missingKeys };

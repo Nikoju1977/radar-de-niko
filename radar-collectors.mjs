@@ -106,10 +106,10 @@ defineCollector({
   source: 'radar',
   version: '2.0',
   mode: 'enrich',                       // patche les items retenus, n'en crée aucun
-  requires: ['reach_twitter', 'reach_reddit', 'reach_exa'],
+  requires: ['reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'],
   collect: ({ results }) => {
     const TERMS = /(loire-atlantique|nantes|châteaubriant|chateaubriant|ancenis|blain|nozay|meilleraye|derval|guémené|guemene|\b44\b)/i;
-    const pool = ['reach_twitter', 'reach_reddit', 'reach_exa']
+    const pool = ['reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa']
       .flatMap(id => results.get(id)?.items ?? []);
 
     return pool

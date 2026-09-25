@@ -7,7 +7,17 @@
  *   node radar-run.mjs --only reddit,exa # filtre de collecteurs
  */
 
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
+
+/* ─── .env local (optionnel) — les variables déjà définies priment ─ */
+try {
+  for (const line of (await readFile(new URL('./.env', import.meta.url), 'utf8')).split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/i);
+    if (m && !line.trim().startsWith('#') && m[2] && process.env[m[1]] === undefined) {
+      process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    }
+  }
+} catch { /* pas de .env : normal en CI */ }
 import { runRegistry, toRSS, toJSONL, toDigest, allCollectors } from './radar-registry.mjs';
 import { setReach } from './radar-collectors.mjs';
 
@@ -24,6 +34,8 @@ const outDir = arg('out', './dist');
 const only = arg('only');
 
 /* ─── Branchement d'Agent Reach ──────────────────────────────── */
+
+const unavailable = new Set();
 
 if (flag('stub')) {
   const now = Date.now();
@@ -54,20 +66,27 @@ if (flag('stub')) {
     return FIXTURES[platform] ?? [];
   });
 } else {
-  // ⚠️ Remplacer par ton adaptateur réel.
   const mod = await import('./radar-agent-reach.mjs').catch(() => null);
   if (!mod?.search) {
     console.error('radar-agent-reach.mjs introuvable ou sans export search(). Utilise --stub pour tester.');
     process.exit(1);
   }
   setReach((platform, opts) => mod.search(platform, opts));
+  // Sources sans clé : écartées proprement au lieu d'échouer en boucle.
+  for (const p of mod.platforms()) {
+    const miss = mod.missingKeys(p);
+    if (miss.length) { unavailable.add(p); console.log(`⏭ ${p} ignoré — ${miss.join(', ')} absente(s)`); }
+  }
 }
 
 /* ─── Exécution ──────────────────────────────────────────────── */
 
-const filter = only
-  ? c => only.split(',').some(k => c.id.includes(k.trim()) || c.source === k.trim())
-  : null;
+const wanted = only ? only.split(',').map(k => k.trim()).filter(Boolean) : null;
+// Les enrichisseurs suivent toujours : --only ne restreint que les sources.
+const filter = c => c.mode === 'enrich' || (
+  !unavailable.has(c.source) &&
+  (!wanted || wanted.some(k => c.id.includes(k) || c.source === k))
+);
 
 console.log(`${allCollectors().length} collecteurs déclarés · requête « ${query} »`);
 
@@ -89,3 +108,10 @@ console.log(toDigest(run));
 const failed = run.reports.filter(r => r.status === 'error');
 console.log(`→ ${outDir}/radar.xml · radar.jsonl · radar.md`);
 if (failed.length) console.log(`⚠ ${failed.length} source(s) en échec — la veille reste exploitable.`);
+
+// Code de sortie : 3 si aucune source n'a pu tourner avec succès (veille vide par panne).
+const sources = run.reports.filter(r => r.collector.mode !== 'enrich');
+if (!flag('stub') && sources.length && !sources.some(r => r.status === 'ok' || r.status === 'empty')) {
+  console.error('✗ aucune source opérationnelle');
+  process.exitCode = 3;
+}

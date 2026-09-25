@@ -74,3 +74,23 @@ defineCollector({id:'enr',name:'E',source:'s',version:'1',mode:'enrich',requires
   collect:()=>[{id:'inexistant',patch:{tags:['zz']}}]});
 r=await runRegistry({});
 ok('patch orphelin compté sans crash', r.reports[1].orphan===1);
+
+// 10. enrichisseur : une source morte ne prive pas les autres
+resetRegistry();
+defineCollector({id:'vivante',name:'V',source:'v',version:'1',collect:()=>[{title:'Nantes',url:'https://ex.com/v'}]});
+defineCollector({id:'morte',name:'M',source:'m',version:'1',retries:0,collect:()=>{ throw new Error('clé absente'); }});
+defineCollector({id:'tag',name:'T',source:'t',version:'1',mode:'enrich',requires:['vivante','morte'],
+  collect:({results})=>(results.get('vivante')?.items??[]).map(i=>({id:i.id,patch:{tags:['44']}}))});
+r=await runRegistry({});
+ok('enrichissement appliqué malgré une source en échec', r.items[0]?.tags?.includes('44'));
+
+// 11. enrichisseur : dépendance filtrée (--only) ignorée
+r=await runRegistry({filter:c=>c.id!=='morte'});
+ok('enrichissement appliqué avec dépendance hors sélection', r.items[0]?.tags?.includes('44'));
+
+// 12. enrichisseur : toutes ses sources mortes → skipped, pas d'erreur
+resetRegistry();
+defineCollector({id:'morte',name:'M',source:'m',version:'1',retries:0,collect:()=>{ throw new Error('x'); }});
+defineCollector({id:'tag',name:'T',source:'t',version:'1',mode:'enrich',requires:['morte'],collect:()=>[]});
+r=await runRegistry({});
+ok('enrichisseur sauté si aucune source vivante', r.reports.find(x=>x.collector.id==='tag').status==='skipped');

@@ -1,0 +1,77 @@
+name: Radar
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: Requête de veille
+        default: Châteaubriant Loire-Atlantique
+      only:
+        description: Sources (ex. reddit,exa) — vide = toutes celles qui ont leurs clés
+        default: ''
+      since:
+        description: Date plancher ISO (ex. 2026-09-01) — optionnel
+        default: ''
+  schedule:
+    - cron: '0 6 * * *'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Syntaxe
+        run: for f in *.mjs; do node --check "$f"; done
+      - name: Tests
+        run: npm test
+      - name: Run stub
+        run: node radar-run.mjs --stub --out ./dist
+      - name: RSS valide
+        run: python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('dist/radar.xml'); print('RSS valide')"
+
+  veille:
+    runs-on: ubuntu-latest
+    needs: tests
+    if: github.event_name != 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Run réel
+        env:
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          QUERY: ${{ github.event.inputs.query || 'Châteaubriant Loire-Atlantique' }}
+          ONLY: ${{ github.event.inputs.only }}
+          SINCE: ${{ github.event.inputs.since }}
+        run: |
+          set -o pipefail
+          args=(--query "$QUERY" --out ./dist)
+          [ -n "$ONLY" ]  && args+=(--only "$ONLY")
+          [ -n "$SINCE" ] && args+=(--since "$SINCE")
+          node radar-run.mjs "${args[@]}" 2>&1 | tee ./dist-log.txt
+      - name: Résumé
+        if: always()
+        run: '[ -f dist/radar.md ] && cat dist/radar.md >> "$GITHUB_STEP_SUMMARY" || true'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: radar
+          path: |
+            dist/
+            dist-log.txt
+          if-no-files-found: warn

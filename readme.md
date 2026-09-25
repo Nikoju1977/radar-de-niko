@@ -40,22 +40,44 @@ node radar-run.mjs --only reddit,exa
 
 Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`.
 
-## Branchement d'Agent Reach
+## Clés et sources
 
-Le seul point d'injection est `setReach()` dans `radar-collectors.mjs`.
-Déposer `radar-agent-reach.mjs` à la racine, avec un export `search(platform, opts) -> items[]`.
+| Source | Variable(s) | Sans clé |
+|---|---|---|
+| Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (optionnels) | JSON public — refusé (403) depuis les IP GitHub Actions |
+| YouTube | `YOUTUBE_API_KEY` | ignorée |
+| Exa | `EXA_API_KEY` | ignorée |
+| Twitter / X | `TWITTER_BEARER_TOKEN` (API v2 recent search, offre payante) | ignorée |
+
+En local : copier `.env.example` en `.env`, il est chargé automatiquement.
+Une source sans clé est écartée avant le run, pas comptée en échec.
+
+## CI (`.github/workflows/radar.yml`)
+
+- `push` sur `main` : syntaxe, 3 suites de tests, run stub, validation RSS.
+- Chaque jour à 6 h UTC + déclenchement manuel (requête, sources, date plancher) :
+  run réel avec les secrets du dépôt, digest dans le résumé du run,
+  `radar.xml` / `radar.jsonl` / `radar.md` en artefact `radar`.
+- Code de sortie 3 si aucune source n'a pu tourner.
 
 ## Garanties vérifiées
 
 - Cycle, id dupliqué, source manquante, dépendance inconnue : bloquent au démarrage
-- Timeout par collecteur, avec reprises
+- Timeout par collecteur, avec reprises (429 + Retry-After, 5xx)
 - Collecteurs I/O lancés en parallèle par niveau de dépendance
 - Une source morte n'emporte pas la veille (`allSettled`)
+- L'enrichissement 44 tourne dès qu'une source a produit, même si d'autres échouent ou sont filtrées
 - Déduplication par URL canonique (UTM, fbclid, gclid, fragment, slash final)
 - Échappement XML des titres dans le flux RSS
 
+## Tests
+
+```bash
+npm test     # noyau + adaptateur (fetch simulé) + chaîne complète
+npm run stub # run fictif, aucun réseau
+```
+
 ## Limites connues
 
-- Les mappings de champs des collecteurs sont déduits des formes habituelles des APIs,
-  pas d'un adaptateur Agent Reach réel — à valider au premier run branché.
-- Pas de pagination ni de gestion de quota par plateforme.
+- YouTube : `viewCount` non récupéré (exigerait un appel `videos.list`, +1 unité de quota).
+- Twitter : fenêtre de 7 jours imposée par l'API recent search.

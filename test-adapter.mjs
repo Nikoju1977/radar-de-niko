@@ -7,7 +7,9 @@
  * elles-mêmes — seul un run avec clés peut valider ce dernier point.
  */
 
-import { search } from './radar-agent-reach.mjs';
+import { search, missingKeys } from './radar-agent-reach.mjs';
+
+delete process.env.REDDIT_CLIENT_ID; delete process.env.REDDIT_CLIENT_SECRET;
 
 let failed = 0;
 const ok = (n, c) => { if (!c) failed++; console.log((c ? '✓' : '✗ ÉCHEC') + ' ' + n); };
@@ -161,3 +163,27 @@ try { await search('mastodon', {}); } catch (e) { threw = e.message; }
 ok('plateforme inconnue rejetée', /inconnue/.test(threw ?? ''));
 
 restore();
+
+/* ─── Reddit : OAuth applicatif et diagnostic 403 ─────────────── */
+mockFetch([['reddit.com/search.json', () => ({ status: 403, body: 'blocked' })]]);
+try { await search('reddit', { query: 'x', limit: 5 }); ok('reddit 403 anonyme : erreur attendue', false); }
+catch (e) { ok('reddit 403 anonyme : message actionnable', /REDDIT_CLIENT_ID/.test(e.message)); }
+
+process.env.REDDIT_CLIENT_ID = 'cid'; process.env.REDDIT_CLIENT_SECRET = 'sec';
+mockFetch([
+  ['/api/v1/access_token', (u, init) => ({ body: {
+    access_token: init.headers.authorization === 'Basic ' + Buffer.from('cid:sec').toString('base64') ? 'TOK' : null,
+    expires_in: 3600 } })],
+  ['oauth.reddit.com/search', (u, init) => ({ body: { data: { after: null, children: init.headers.authorization === 'Bearer TOK'
+    ? [{ data: { title: 'OAuth ok', permalink: '/r/nantes/comments/z', created_utc: 1e9, author: 'a', score: 1 } }] : [] } } })]
+]);
+r = await search('reddit', { query: 'Blain', limit: 5 });
+ok('reddit OAuth : jeton Basic puis Bearer', r.length === 1 && r[0].title === 'OAuth ok');
+r = await search('reddit', { query: 'Blain', limit: 5 });
+ok('reddit OAuth : jeton mis en cache', calls.filter(c => c.url.includes('access_token')).length === 1);
+delete process.env.REDDIT_CLIENT_ID; delete process.env.REDDIT_CLIENT_SECRET;
+
+ok('missingKeys : reddit sans clé requise', missingKeys('reddit', {}).length === 0);
+ok('missingKeys : exa signale sa clé', missingKeys('exa', {})[0] === 'EXA_API_KEY');
+ok('missingKeys : twitter satisfait', missingKeys('twitter', { TWITTER_BEARER_TOKEN: 't' }).length === 0);
+globalThis.fetch = realFetch;
