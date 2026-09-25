@@ -126,6 +126,9 @@ await mkdir(outDir, { recursive: true });
 await writeFile(`${outDir}/radar.xml`, toRSS(run.items));
 await writeFile(`${outDir}/radar.jsonl`, toJSONL(run.items));
 await writeFile(`${outDir}/radar.md`, toDigest(run));
+// Fichiers PWA (manifeste, service worker, icônes, écrans de démarrage iOS)
+await import('node:fs/promises').then(fs => fs.cp(new URL('./public/', import.meta.url), outDir, { recursive: true }))
+  .catch(e => console.error(`public/ non copié : ${e.message}`));
 await writeFile(`${outDir}/index.html`, toHTML(run, { every: Number(arg('every', 15)) }));
 
 console.log(toDigest(run));

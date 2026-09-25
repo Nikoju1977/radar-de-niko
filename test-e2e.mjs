@@ -118,4 +118,16 @@ ok('page : titres échappés (pas d\'injection)', !html.includes('<script>alert(
 ok('page : aucun fetch/XHR côté navigateur', !/fetch\(|XMLHttpRequest/.test(html));
 ok('page : un seul identifiant par item', new Set(html.match(/<li id="[^"]+"/g)).size === run.items.length);
 
+ok('pwa : manifeste, service worker et icône iOS référencés',
+   html.includes('rel="manifest"') && html.includes("register('sw.js')") && html.includes('apple-touch-icon'));
+ok('pwa iOS : mode plein écran et écrans de démarrage', html.includes('apple-mobile-web-app-capable') && (html.match(/apple-touch-startup-image/g) ?? []).length >= 10);
+{
+  const { readFileSync, existsSync } = await import('node:fs');
+  const man = JSON.parse(readFileSync(new URL('./public/manifest.webmanifest', import.meta.url), 'utf8'));
+  ok('pwa : icônes du manifeste présentes (dont maskable)',
+     man.icons.every(i => existsSync(new URL('./public/' + i.src, import.meta.url))) && man.icons.some(i => i.purpose === 'maskable'));
+  ok('pwa : écrans de démarrage iOS présents', [...html.matchAll(/apple-touch-startup-image[^>]*href="([^"]+)"/g)]
+     .every(([, f]) => existsSync(new URL('./public/' + f, import.meta.url))));
+}
+
 console.log(`\n${run.items.length} items, ${run.dupes.length} doublon(s) fusionné(s)`);

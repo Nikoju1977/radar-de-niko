@@ -33,6 +33,7 @@ Ajouter une source = ajouter un `defineCollector()`. Rien d'autre à toucher.
 | `radar-agent-reach.mjs` | Clients HTTP des plateformes (reprises, OAuth Reddit, parseur RSS) |
 | `radar-run.mjs` | Point d'entrée CLI |
 | `radar-page.mjs` | Page publique statique (balayage 24 h, filtres) |
+| `public/` | PWA : manifeste, service worker (lecture hors ligne), icônes, écrans de démarrage iOS |
 | `radar-sources.json` | Flux RSS fixes et hashtags Mastodon |
 
 ## Utilisation
@@ -44,6 +45,15 @@ node radar-run.mjs --only reddit,exa
 ```
 
 Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`.
+
+## Application (PWA)
+
+Installable depuis https://nikoju1977.github.io/radar-de-niko/ :
+- **Android / Chrome / Edge** : bouton « Installer l'app » dans l'en-tête.
+- **iPhone / iPad** : dans Safari, Partager → « Sur l'écran d'accueil » (une aide s'affiche au premier passage).
+
+Hors ligne, la dernière veille reçue reste lisible. Raccourcis : `?f=new` (nouveautés), `?f=l44` (Loire-Atlantique).
+Badge d'icône = nombre de nouveautés (Android ; iOS 16.4+ si les notifications sont autorisées).
 
 ## Clés et sources
 
