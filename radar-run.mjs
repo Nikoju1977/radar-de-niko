@@ -137,6 +137,9 @@ if (process.env.GITHUB_ACTIONS === 'true' && !flag('stub')) {
   const esc = t => String(t).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
   for (const p of unavailable) console.log(`::notice title=${p} ignoré::clé absente des secrets du dépôt`);
   for (const r of failed) console.log(`::error title=${r.collector.id}::${esc(r.error)}`);
+  const per = run.reports.filter(r => r.collector.mode !== 'enrich' && r.status !== 'skipped')
+    .map(r => `${r.collector.source} ${r.status === 'error' ? '✗' : r.items.length}`).join(' · ');
+  console.log(`::notice title=Radar ${run.items.length} items${run.fresh != null ? ` · ${run.fresh} nouveaux` : ''}::${per}`);
 }
 
 // Code de sortie : 3 si aucune source n'a pu tourner avec succès (veille vide par panne).
