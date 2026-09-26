@@ -59,7 +59,7 @@ export function toHTML(run, { title = 'Radar de Niko', feedUrl = 'radar.xml', ev
 <html lang="fr"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="refresh" content="${every * 60}">
+<noscript><meta http-equiv="refresh" content="${every * 60}"></noscript>
 <title>${esc(title)} · veille Loire-Atlantique</title>
 <meta name="theme-color" content="#06120f">
 <meta name="color-scheme" content="dark">
@@ -199,6 +199,13 @@ ${sweep(items, sources, now)}
   /* Hors ligne : la page vient du cache */
   var off=document.getElementById('off');function net(){off.classList.toggle('hide',navigator.onLine!==false);}
   window.addEventListener('online',net);window.addEventListener('offline',net);net();
+
+  /* Rafraîchissement : au premier plan et en ligne uniquement ; au retour dans l'app si la veille a vieilli */
+  var PERIODE=${every}*60000,charge=Date.now();
+  function frais(){if(document.visibilityState==='visible'&&navigator.onLine!==false&&Date.now()-charge>=PERIODE)location.reload();}
+  setInterval(frais,60000);
+  document.addEventListener('visibilitychange',frais);
+  window.addEventListener('pageshow',function(e){if(e.persisted)frais();});
 
   /* Badge d'icône : nombre de nouveautés (Android, iOS 16.4+ installé) */
   if(navigator.setAppBadge){var n=document.querySelectorAll('#liste li[data-new]').length;(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(function(){});}

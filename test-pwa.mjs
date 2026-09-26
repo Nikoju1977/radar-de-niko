@@ -53,6 +53,7 @@ ok(`ressources PWA toutes servies (${hrefs.length} : icônes, écrans de démarr
 ok('iOS : apple-mobile-web-app-capable', /apple-mobile-web-app-capable" content="yes"/.test(html));
 ok('iOS : viewport-fit=cover (encoche)', /viewport-fit=cover/.test(html));
 ok('iOS : marges safe-area', /safe-area-inset-top/.test(html) && /safe-area-inset-bottom/.test(html));
+ok('rafraîchissement JS (pas de meta refresh active qui coupe la lecture)', !/^<meta http-equiv="refresh"/m.test(html) && /PERIODE=\d+\*60000/.test(html));
 
 /* ─── Profils navigateur ─── */
 const CRIOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0 Mobile/15E148 Safari/604.1';
