@@ -41,10 +41,31 @@ jobs:
       - name: RSS valide
         run: python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('dist/radar.xml'); print('RSS valide')"
 
+  pwa:
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: '22' }
+      - name: Site de test
+        run: node radar-run.mjs --stub --out ./dist
+      - name: Navigateurs (Chromium + WebKit, moteur de Safari iOS)
+        run: npm i --no-save playwright@1.55.0 && npx playwright install --with-deps chromium webkit
+      - name: PWA sur Chrome desktop, Safari iPhone et Chrome iPhone
+        env: { PWA_STRICT: '1' }
+        run: node test-pwa.mjs ./dist
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pwa-captures
+          path: pwa-shots/
+          if-no-files-found: warn
+
   veille:
     runs-on: ubuntu-latest
-    needs: tests
-    if: always() && github.event_name == 'workflow_dispatch' && needs.tests.result == 'success'
+    needs: [tests, pwa]
+    if: always() && github.event_name == 'workflow_dispatch' && needs.tests.result == 'success' && needs.pwa.result == 'success'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

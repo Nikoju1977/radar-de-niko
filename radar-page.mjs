@@ -145,7 +145,7 @@ ${sweep(items, sources, now)}
 <p class="legend">Dernières 24 h, une ligne par source :<i style="background:var(--ambre)"></i>nouveau<i style="background:var(--phos)"></i>Loire-Atlantique<i style="background:var(--sourd)"></i>autre</p>
 <nav class="filters" aria-label="Filtrer">${chips}</nav>
 <main id="liste">${list || '<p class="vide">Aucune information collectée à ce run. Le prochain passage a lieu dans moins de ' + every + ' minutes.</p>'}</main>
-<div class="ios hide" id="ios" role="dialog" aria-label="Installer sur l'écran d'accueil">Pour installer Radar 44 : touchez <svg width="16" height="20" viewBox="0 0 16 20" aria-label="Partager"><path d="M8 1v12M4 5l4-4 4 4" fill="none" stroke="#3dffb0" stroke-width="1.8"/><path d="M5 8H2v11h12V8h-3" fill="none" stroke="#3dffb0" stroke-width="1.8"/></svg> Partager, puis « Sur l'écran d'accueil ».<button type="button" id="iosx" aria-label="Fermer">×</button></div>
+<div class="ios hide" id="ios" role="dialog" aria-label="Installer sur l'écran d'accueil"><span id="iostxt">Pour installer Radar 44 : touchez <svg width="16" height="20" viewBox="0 0 16 20" aria-label="Partager"><path d="M8 1v12M4 5l4-4 4 4" fill="none" stroke="#3dffb0" stroke-width="1.8"/><path d="M5 8H2v11h12V8h-3" fill="none" stroke="#3dffb0" stroke-width="1.8"/></svg> Partager, puis « Sur l'écran d'accueil ».</span><button type="button" id="iosx" aria-label="Fermer">×</button></div>
 <p class="vide hide" id="rien">Rien pour ce filtre sur ce run.</p>
 <footer>Veille automatique ${esc(title)} · Journal 44 — Studio Niko Design. ${items.length} informations, ${run.dupes?.length ?? 0} doublons fusionnés. Sources : ${sources.map(s => esc(label(s))).join(', ')}.</footer>
 <script>
@@ -191,7 +191,9 @@ ${sweep(items, sources, now)}
   var ua=navigator.userAgent,isIOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   var isSafari=/Safari/.test(ua)&&!/CriOS|FxiOS|EdgiOS|OPiOS|GSA/.test(ua);
   var seen=false;try{seen=localStorage.getItem('radar-ios-aide')==='1';}catch(e){}
-  if(isIOS&&isSafari&&!standalone&&!seen){var box=document.getElementById('ios');box.classList.remove('hide');
+  if(isIOS&&!standalone&&!seen){var box=document.getElementById('ios');
+    if(!isSafari)document.getElementById('iostxt').textContent='Pour installer Radar 44 : dans Chrome ou Edge, touchez Partager, puis \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb (iOS 16.4 ou plus). Sinon, ouvrez cette page dans Safari.';
+    box.classList.remove('hide');
     document.getElementById('iosx').addEventListener('click',function(){box.classList.add('hide');try{localStorage.setItem('radar-ios-aide','1');}catch(e){}});}
 
   /* Hors ligne : la page vient du cache */

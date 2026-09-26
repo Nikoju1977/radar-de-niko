@@ -1,7 +1,7 @@
 /* Radar de Niko — service worker.
  * Réseau d'abord pour la veille (toujours la plus fraîche en ligne),
  * cache en repli : hors ligne, la dernière veille reçue reste lisible. */
-const CACHE = 'radar-v1';
+const CACHE = 'radar-v2';
 const SHELL = ['./', 'index.html', 'radar.xml', 'radar.jsonl', 'manifest.webmanifest',
                'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon-32.png'];
 
@@ -31,8 +31,13 @@ self.addEventListener('fetch', e => {
     return;
   }
   const isPage = req.mode === 'navigate';
+  // Une requête de navigation ne peut pas être recopiée avec des options
+  // (TypeError sur Chrome et Safari) : on en reconstruit une à partir de l'URL.
+  const net = isPage
+    ? fetch(new Request(url.href, { cache: 'no-store', credentials: 'same-origin' }))
+    : fetch(req, { cache: 'no-store' });
   e.respondWith(
-    fetch(req, { cache: 'no-store' }).then(res => {
+    net.then(res => {
       if (res.ok) {
         const copy = res.clone();
         // Une seule entrée pour la page, quels que soient les paramètres (?f=new, ?source=pwa)

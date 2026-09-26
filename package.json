@@ -7,7 +7,8 @@
   "scripts": {
     "stub": "node radar-run.mjs --stub",
     "radar": "node radar-run.mjs",
-    "test": "node test-registry.mjs && node test-adapter.mjs && node test-e2e.mjs"
+    "test": "node test-registry.mjs && node test-adapter.mjs && node test-e2e.mjs",
+    "test:pwa": "node radar-run.mjs --stub --out ./dist && node test-pwa.mjs ./dist"
   },
   "engines": {
     "node": ">=18"
