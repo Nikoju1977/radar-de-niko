@@ -24,7 +24,9 @@ const skip = n => { untested++; if (GHA) console.log(`::warning title=PWA non te
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json',
   '.png': 'image/png', '.xml': 'application/rss+xml', '.jsonl': 'application/jsonl', '.md': 'text/markdown' };
 let override = null;   // permet de simuler une nouvelle veille publiée
+let down = false;      // serveur injoignable : connexion coupée net (zone blanche)
 const server = http.createServer(async (req, res) => {
+  if (down) { req.socket.destroy(); return; }
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
   const file = normalize(join(ROOT, p));
@@ -107,11 +109,31 @@ for (const P of PROFILES) {
   ok(`${P.name} : en ligne, la nouvelle veille remplace l'ancienne`, await page.locator('#fraiche').count() === 1);
   override = null;
 
+  const cached = await page.evaluate(async () => {
+    const out = [];
+    for (const k of await caches.keys()) for (const r of await (await caches.open(k)).keys()) out.push(new URL(r.url).pathname + new URL(r.url).search);
+    return out;
+  });
+  ok(`${P.name} : page mise en cache par le service worker (${cached.length} entrées)`, cached.includes('/'));
+
+  // 1. Réseau coupé côté serveur : la requête atteint le SW et échoue → repli cache
+  down = true;
+  let blancheOk = false;
+  try { await page.goto(BASE + '?f=l44'); blancheOk = await page.locator('#liste li').count() > 0; } catch (e) { console.log('   ', e.message.split('\n')[0]); }
+  ok(`${P.name} : réseau coupé, dernière veille lisible`, blancheOk);
+  down = false;
+  await page.goto(BASE);
+
+  // 2. Mode avion émulé par le moteur de test
   await ctx.setOffline(true);
   let offlineOk = false;
   try { await page.goto(BASE + '?f=new'); offlineOk = await page.locator('#liste li').count() > 0; } catch {}
-  ok(`${P.name} : hors ligne, dernière veille lisible`, offlineOk);
-  ok(`${P.name} : bandeau hors ligne visible`, offlineOk && await page.locator('#off').isVisible());
+  if (!offlineOk && P.engine === webkit && blancheOk) {
+    skip(`${P.name} : mode avion émulé (setOffline de Playwright ne passe pas par le service worker sous WebKit ; repli cache déjà prouvé réseau coupé)`);
+  } else {
+    ok(`${P.name} : mode avion, dernière veille lisible`, offlineOk);
+    ok(`${P.name} : bandeau hors ligne visible`, offlineOk && await page.locator('#off').isVisible());
+  }
   await ctx.setOffline(false);
   await browser.close();
 }
@@ -120,3 +142,4 @@ server.close();
 if (GHA) console.log(`::notice title=PWA::${failed ? `${failed} échec(s)` : 'tout vert'}${untested ? ` · ${untested} non testé(s)` : ''}`);
 console.log(`\nPWA : ${failed ? `${failed} échec(s)` : 'tout vert'}${untested ? ` · ${untested} point(s) non testé(s)` : ''}`);
 process.exitCode = failed ? 1 : 0;
+process.exit();
