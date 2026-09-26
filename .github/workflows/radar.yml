@@ -54,7 +54,16 @@ jobs:
         run: npm i --no-save playwright@1.55.0 && npx playwright install --with-deps chromium webkit
       - name: PWA sur Chrome desktop, Safari iPhone et Chrome iPhone
         env: { PWA_STRICT: '1' }
-        run: node test-pwa.mjs ./dist
+        shell: bash
+        run: |
+          set +e
+          node test-pwa.mjs ./dist > pwa-out.txt 2>&1; code=$?
+          cat pwa-out.txt
+          if [ $code -ne 0 ]; then
+            msg=$(tail -c 2500 pwa-out.txt | grep -v '^::' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Sortie du test PWA::$msg"
+          fi
+          exit $code
       - uses: actions/upload-artifact@v6
         if: always()
         with:
