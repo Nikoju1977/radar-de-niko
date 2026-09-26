@@ -16,8 +16,9 @@ import { chromium, webkit, devices } from 'playwright';
 const ROOT = process.argv[2] ?? './dist';
 const STRICT = process.env.PWA_STRICT === '1';     // CI : un moteur manquant = échec
 let failed = 0, untested = 0;
-const ok = (n, c) => { if (!c) failed++; console.log((c ? '✓' : '✗ ÉCHEC') + ' ' + n); };
-const skip = n => { untested++; console.log('○ non testé : ' + n); };
+const GHA = process.env.GITHUB_ACTIONS === 'true';
+const ok = (n, c) => { if (!c) { failed++; if (GHA) console.log(`::error title=PWA::${n}`); } console.log((c ? '✓' : '✗ ÉCHEC') + ' ' + n); };
+const skip = n => { untested++; if (GHA) console.log(`::warning title=PWA non testé::${n}`); console.log('○ non testé : ' + n); };
 
 /* ─── Serveur statique (types MIME corrects, comme GitHub Pages) ─── */
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json',
@@ -72,7 +73,7 @@ for (const P of PROFILES) {
 
   await page.goto(BASE, { waitUntil: 'load' });
   await page.waitForTimeout(300);
-  ok(`${P.name} : aucune erreur JavaScript`, errors.length === 0 || (console.log('   ', errors), false));
+  ok(`${P.name} : aucune erreur JavaScript${errors.length ? ` — ${errors.join(' | ').slice(0, 200)}` : ''}`, errors.length === 0);
   ok(`${P.name} : liste de la veille affichée`, await page.locator('#liste li').count() > 0);
   ok(`${P.name} : pas de défilement horizontal`, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
 
@@ -115,5 +116,6 @@ for (const P of PROFILES) {
 }
 
 server.close();
+if (GHA) console.log(`::notice title=PWA::${failed ? `${failed} échec(s)` : 'tout vert'}${untested ? ` · ${untested} non testé(s)` : ''}`);
 console.log(`\nPWA : ${failed ? `${failed} échec(s)` : 'tout vert'}${untested ? ` · ${untested} point(s) non testé(s)` : ''}`);
 process.exitCode = failed ? 1 : 0;
