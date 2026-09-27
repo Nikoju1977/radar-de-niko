@@ -14,14 +14,17 @@ const TIME = new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit'
 });
 
-const REGIONAL = /(loire[- ]atlantique|châteaubriant|chateaubriant|derval|nozay|rougé|rouge|moisdon|meilleraye|nantes|ancenis|blain|brière|briere|44\b)/i;
-const LOCAL_SOURCE = /(éclaireur|eclaireur|la mée|la mee|mairie de châteaubriant|chateaubriant|loire[- ]atlantique|loire océan|loire ocean|france 3.*loire|préfecture 44|prefecture 44)/i;
+const LOCAL_SOURCE = /(éclaireur de châteaubriant|eclaireur de chateaubriant|journal la mée|journal la mee|mairie de châteaubriant|mairie de chateaubriant|france 3 loire-atlantique|préfecture 44|prefecture 44)/i;
+const LOCAL_URL = /(loire-atlantique(?:-44)?|chateaubriant|journal-la-mee|l-eclaireur-de-chateaubriant)/i;
+const PLACE_RX = /(?:^|[^a-z])(loire[- ]atlantique|chateaubriant|derval|nozay|moisdon(?:-la-riviere)?|la meilleraye(?:-de-bretagne)?|nantes|nantais|saint[- ]nazaire|ancenis|blain|briere|reze|saint[- ]herblain|orvault|vertou|bouguenais|carquefou|guerande|la baule|pornic|clisson|pontchateau|saint[- ]brevin|montoir(?:-de-bretagne)?|savenay|coueron|heric|saffre|isse|erbray|guemene[- ]penfao|sion[- ]les[- ]mines)(?:[^a-z]|$)/i;
+const fold = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const hasRegionalPlace = s => PLACE_RX.test(fold(s)) || /rougé/i.test(String(s ?? ''));
 
 export const THEMES = [
   ['Sécurité & faits divers', /(accident|incendie|feu|police|gendarmer|secours|pompiers|disparition|agression|vol\b|cambriol|justice|tribunal|condamn|sécurité|securite|alerte)/i],
-  ['Mobilité & travaux', /(route|rn\s?\d+|déviation|deviation|travaux|circulation|trafic|train|ter\b|gare|bus|car\b|tram|transport|mobilité|mobilite|voirie|piste cyclable)/i],
+  ['Mobilité & travaux', /(route|rn\s?\d+|déviation|deviation|travaux|circulation|trafic|\btrain(?:s)?\b|\bter\b|gare|\bbus\b|\bcar(?:s)?\b|tram|transport|mobilité|mobilite|voirie|piste cyclable|covoiturage)/i],
   ['Économie & emploi', /(entreprise|emploi|recrut|commerce|commerçant|commercant|industrie|usine|marché|marche|économie|economie|artisan|investissement|immobilier)/i],
-  ['Environnement & agriculture', /(agricultur|élevage|elevage|ferme|pesticide|sécheresse|secheresse|eau\b|environnement|climat|biodivers|forêt|foret|rivière|riviere|déchet|dechet|énergie|energie|éolien|eolien)/i],
+  ['Environnement & agriculture', /(agricultur|élevage|elevage|ferme|pesticide|sécheresse|secheresse|\beau\b|environnement|climat|biodivers|forêt|foret|rivière|riviere|déchet|dechet|énergie|energie|éolien|eolien|solaire|co2)/i],
   ['Santé & solidarité', /(santé|sante|hôpital|hopital|médecin|medecin|ehpad|handicap|solidarit|social|cancer|don du sang)/i],
   ['Éducation & jeunesse', /(école|ecole|collège|college|lycée|lycee|élève|eleve|étudiant|etudiant|jeunesse|crèche|creche|formation|apprentissage|universit)/i],
   ['Culture & sorties', /(concert|festival|spectacle|cinéma|cinema|théâtre|theatre|exposition|expo\b|musée|musee|médiathèque|mediatheque|livre|patrimoine|foire|salon|fête|fete|agenda|sortie)/i],
@@ -33,8 +36,11 @@ export const THEMES = [
 export function isRegionalItem(item, now = Date.now()) {
   const t = Date.parse(item.publishedAt);
   if (!Number.isFinite(t) || t < now - 24 * 3600e3 || t > now + 5 * 60e3) return false;
-  const hay = [item.title, item.summary, item.author, item.url, ...(item.tags ?? [])].filter(Boolean).join(' ');
-  return item.tags?.includes('44') || LOCAL_SOURCE.test(item.author ?? '') || REGIONAL.test(hay);
+  const text = [item.title, item.summary].filter(Boolean).join(' ');
+  return item.tags?.includes('44')
+    || LOCAL_SOURCE.test(item.author ?? '')
+    || LOCAL_URL.test(item.url ?? '')
+    || hasRegionalPlace(text);
 }
 
 export function themeFor(item) {
