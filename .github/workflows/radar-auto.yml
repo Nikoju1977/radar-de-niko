@@ -1,3 +1,4 @@
+# Collecte automatique et publication du flux RSS du Radar.
 name: Radar Auto
 
 on:
