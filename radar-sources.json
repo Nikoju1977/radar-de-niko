@@ -1,10 +1,20 @@
 {
-  "_doc": "Flux fixes RSS/Atom gratuits, sans clé. Les flux sont filtrés par fraîcheur avec maxAgeDays. Vérifiés le 2026-09-27.",
+  "_doc": "Flux fixes RSS/Atom gratuits, sans clé. Priorité aux sources hyperlocales et officielles ; filtrage par fraîcheur via maxAgeDays. Vérifiés le 2026-09-27.",
   "feeds": [
     {
       "name": "L'Éclaireur de Châteaubriant",
       "url": "https://actu.fr/l-eclaireur-de-chateaubriant/rss.xml",
       "maxAgeDays": 14
+    },
+    {
+      "name": "Mairie de Châteaubriant · Agenda",
+      "url": "https://www.mairie-chateaubriant.fr/feed/?post_type=agenda",
+      "maxAgeDays": 30
+    },
+    {
+      "name": "Mairie de Châteaubriant · Actualités",
+      "url": "https://www.mairie-chateaubriant.fr/feed/?post_type=post",
+      "maxAgeDays": 21
     },
     {
       "name": "Journal La Mée Châteaubriant",
