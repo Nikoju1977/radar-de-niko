@@ -215,11 +215,13 @@ ok('rss : suffixe « - Source » retiré, entités décodées', parsed[0].title 
 ok('rss : source extraite', parsed[0].source === 'Ouest-France');
 ok('rss : description CDATA nettoyée du HTML', !/[<>]/.test(parsed[0].description));
 ok('rss : entités numériques', parsed[1].title === 'Titre élément');
+const spip = parseRSS('<?xml version="1.0"?><rss><channel><item><title>Info locale</title><link>https://ex.com/spip</link><dc:date>2026-09-26T18:30:00Z</dc:date></item></channel></rss>');
+ok('rss SPIP : dc:date reconnu', spip[0]?.pubDate === '2026-09-26T18:30:00Z');
 
 mockFetch([['news.google.com/rss/search', (u, init) => ({ body: null, text: RSS, _u: u, _a: init.headers.accept })]]);
 globalThis.fetch = (orig => async (u, i) => { const r = await orig(u, i); r.text = async () => RSS; return r; })(globalThis.fetch);
 r = await search('gnews', { query: 'Nozay', since: '2026-09-01', limit: 10 });
-ok('gnews : items récupérés sans clé', r.length === 2);
+ok('gnews : élément sans date valide écarté', r.length === 1 && r[0].title.includes('Nozay'));
 ok('gnews : paramètres FR + filtre after:', /hl=fr/.test(calls[0].url) && /after%3A2026-09-01/.test(calls[0].url));
 globalThis.fetch = realFetch;
 
