@@ -284,7 +284,16 @@ export async function runRegistry({ query = '', since = null, filter = null, log
    Sorties — découplées des collecteurs
    ═══════════════════════════════════════════════════════════ */
 
-const xml = s => String(s ?? '')
+// XML 1.0 interdit certains caractères de contrôle et les surrogates isolés.
+const xmlText = s => [...String(s ?? '')].filter(ch => {
+  const cp = ch.codePointAt(0);
+  return cp === 0x9 || cp === 0xA || cp === 0xD
+      || (cp >= 0x20 && cp <= 0xD7FF)
+      || (cp >= 0xE000 && cp <= 0xFFFD)
+      || (cp >= 0x10000 && cp <= 0x10FFFF);
+}).join('');
+
+const xml = s => xmlText(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
