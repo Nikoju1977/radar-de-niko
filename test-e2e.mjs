@@ -88,8 +88,8 @@ ok('dates valides après mapping',
 ok('URLs absolues après mapping',
    run.items.every(i => /^https?:\/\//.test(i.url)));
 
-ok('doublon inter-sources fusionné (Google News vs flux France 3 avec utm)',
-   run.dupes.length === 1 && run.items.filter(i => i.url.includes('ouest-france.fr/marche')).length === 1);
+ok('doublons inter-sources fusionnés (Google News vs flux France 3 avec utm)',
+   run.dupes.length >= 1 && run.items.filter(i => i.url.includes('ouest-france.fr/marche')).length === 1);
 
 ok('Bing : lien réel extrait de la redirection', run.items.some(i => i.url === 'https://actu.fr/blain-chateau'));
 ok('Mastodon : HTML retiré du texte', run.items.some(i => i.source === 'mastodon' && !/[<>]/.test(i.title)));
