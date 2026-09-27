@@ -57,10 +57,13 @@ ok('3 collecteurs en parallèle ('+dt+' ms, séquentiel = 900)', dt<500);
 // 7. échappement XML dans le RSS
 resetRegistry();
 defineCollector({id:'xss',name:'X',source:'s',version:'1',collect:()=>[
-  {title:'Titre & <script>alert(1)</script> "guillemets"',url:'https://ex.com/x',publishedAt:'2026-09-01T00:00:00Z'}]});
+  {title:'Titre & <script>alert(1)</script> "guillemets"',url:'https://ex.com/x',publishedAt:'2026-09-01T00:00:00Z',
+   summary:'Accessibilité, Commu' + String.fromCharCode(2) + 'nication ' + String.fromCharCode(0xD800)}]});
 r=await runRegistry({});
 const xml=toRSS(r.items);
 ok('échappement XML', !xml.includes('<script>') && xml.includes('&amp;') && xml.includes('&lt;script&gt;'));
+ok('caractères interdits XML supprimés',
+   !xml.includes(String.fromCharCode(2)) && !xml.includes(String.fromCharCode(0xD800)));
 
 // 8. date invalide
 resetRegistry();
