@@ -1,3 +1,4 @@
+# Horloge auto-réarmante : déclenche Radar Auto toutes les 15 minutes.
 name: Radar Clock
 
 on:
