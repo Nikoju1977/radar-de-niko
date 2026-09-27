@@ -21,6 +21,7 @@ try {
 import { runRegistry, toRSS, toJSONL, toDigest, allCollectors } from './radar-registry.mjs';
 import { setReach } from './radar-collectors.mjs';
 import { toHTML } from './radar-page.mjs';
+import { toDailyHTML, toFacebookText } from './radar-daily.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback = null) => {
@@ -130,11 +131,13 @@ await writeFile(`${outDir}/radar.md`, toDigest(run));
 await import('node:fs/promises').then(fs => fs.cp(new URL('./public/', import.meta.url), outDir, { recursive: true }))
   .catch(e => console.error(`public/ non copié : ${e.message}`));
 await writeFile(`${outDir}/index.html`, toHTML(run, { every: Number(arg('every', 15)) }));
+await writeFile(`${outDir}/quotidien.html`, toDailyHTML(run));
+await writeFile(`${outDir}/facebook.txt`, toFacebookText(run) + '\n');
 
 console.log(toDigest(run));
 
 const failed = run.reports.filter(r => r.status === 'error');
-console.log(`→ ${outDir}/radar.xml · radar.jsonl · radar.md`);
+console.log(`→ ${outDir}/radar.xml · radar.jsonl · radar.md · quotidien.html · facebook.txt`);
 if (failed.length) console.log(`⚠ ${failed.length} source(s) en échec — la veille reste exploitable.`);
 
 // Annotations GitHub Actions : chaque panne visible dans l'interface du run.
