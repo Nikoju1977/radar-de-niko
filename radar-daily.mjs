@@ -22,7 +22,7 @@ const hasRegionalPlace = s => PLACE_RX.test(fold(s)) || /rougé/i.test(String(s 
 
 export const THEMES = [
   ['Sécurité & faits divers', /(accident|incendie|feu|police|gendarmer|secours|pompiers|disparition|agression|vol\b|cambriol|justice|tribunal|condamn|sécurité|securite|alerte)/i],
-  ['Mobilité & travaux', /(route|rn\s?\d+|déviation|deviation|travaux|circulation|trafic|\btrain(?:s)?\b|\bter\b|gare|\bbus\b|\bcar(?:s)?\b|tram|transport|mobilité|mobilite|voirie|piste cyclable|covoiturage)/i],
+  ['Mobilité & travaux', /(route|rn\s?\d+|déviation|deviation|travaux|circulation|trafic|\btrain(?:s)?\b|\bter\b|gare|\bbus\b|\bcar(?:s)?\b|tram|transport|mobilité|mobilite|voirie|piste cyclable|covoiturage|vélo|velo|cyclable)/i],
   ['Économie & emploi', /(entreprise|emploi|recrut|commerce|commerçant|commercant|industrie|usine|marché|marche|économie|economie|artisan|investissement|immobilier)/i],
   ['Environnement & agriculture', /(agricultur|élevage|elevage|ferme|pesticide|sécheresse|secheresse|\beau\b|environnement|climat|biodivers|forêt|foret|rivière|riviere|déchet|dechet|énergie|energie|éolien|eolien|solaire|co2)/i],
   ['Santé & solidarité', /(santé|sante|hôpital|hopital|médecin|medecin|ehpad|handicap|solidarit|social|cancer|don du sang)/i],
@@ -44,9 +44,21 @@ export function isRegionalItem(item, now = Date.now()) {
 }
 
 export function themeFor(item) {
-  const hay = [item.title, item.summary, item.author].filter(Boolean).join(' ');
+  // Le média/auteur ne doit jamais déterminer la rubrique (ex. "social.rebellion.global").
+  const hay = [item.title, item.summary].filter(Boolean).join(' ');
   for (const [name, rx] of THEMES) if (rx.test(hay)) return name;
   return 'Vie locale';
+}
+
+function leadScore(item, now) {
+  const ageHours = Math.max(0, (now - Date.parse(item.publishedAt)) / 36e5);
+  let score = Math.max(0, 48 - ageHours);
+  if (item.source === 'presse' || item.source === 'gnews') score += 80;
+  if (LOCAL_SOURCE.test(item.author ?? '') || LOCAL_URL.test(item.url ?? '')) score += 70;
+  if (item.tags?.includes('44')) score += 35;
+  if (/^(mastodon|bluesky|reddit|twitter)$/i.test(item.source ?? '')) score -= 45;
+  if (String(item.title ?? '').length >= 45) score += 8;
+  return score;
 }
 
 export function buildDaily(run, now = Date.now()) {
@@ -54,7 +66,8 @@ export function buildDaily(run, now = Date.now()) {
     .sort((a,b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
   const groups = new Map(THEMES.map(([name]) => [name, []]));
   for (const item of items) groups.get(themeFor(item)).push(item);
-  return { items, groups, now, lead: items[0] ?? null };
+  const lead = [...items].sort((a,b) => leadScore(b, now) - leadScore(a, now))[0] ?? null;
+  return { items, groups, now, lead };
 }
 
 const slug = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
