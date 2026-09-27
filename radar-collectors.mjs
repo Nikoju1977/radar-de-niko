@@ -181,7 +181,7 @@ defineCollector({
     return pool
       .filter(i => {
         const raw = `${i.title} ${i.summary ?? ''}`;
-        const folded = raw.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+        const folded = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         return TERMS.test(folded) || /rougé/i.test(raw);
       })
       .map(i => ({ id: i.id, patch: { tags: ['44'], local: true } }));
