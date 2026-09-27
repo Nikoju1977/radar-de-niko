@@ -43,6 +43,12 @@ globalThis.fetch = async (url, init = {}) => {
     { t: 'Blain : le château rouvre', u: 'http://www.bing.com/news/apiclick.aspx?url=https%3a%2f%2factu.fr%2fblain-chateau&c=1', h: 2 }]));
   if (u.includes('actu.fr/l-eclaireur')) return reply(RSS([
     { t: 'Derval : nouvelle boulangerie', u: 'https://actu.fr/derval-boulangerie', h: 3 }]));
+  if (u.includes('mairie-chateaubriant.fr/feed/?post_type=agenda')) return reply(RSS([
+    { t: 'Atelier informatique à Châteaubriant', u: 'https://www.mairie-chateaubriant.fr/agenda/atelier-informatique',
+      h: 2, d: 'Accessibilité, Commu' + String.fromCharCode(2) + 'nication' }]));
+  if (u.includes('mairie-chateaubriant.fr/feed/?post_type=post')) return reply(RSS([
+    { t: 'Actualité municipale à Châteaubriant', u: 'https://www.mairie-chateaubriant.fr/actualites/info', h: 1.5 }]));
+  if (u.includes('journal-la-mee.fr') || u.includes('loire-atlantique.gouv.fr/syndication')) return reply(RSS([]));
   if (u.includes('france3-regions')) return reply(RSS([
     { t: 'Marché de Châteaubriant déplacé', u: 'https://www.ouest-france.fr/marche?utm_source=f3', h: 1 }]));
   if (u.includes('francebleu') || u.includes('ouest-france.fr/rss') || u.includes('franceinfo.fr')) return reply(RSS([]));
@@ -96,6 +102,10 @@ ok('Mastodon : HTML retiré du texte', run.items.some(i => i.source === 'mastodo
 ok('Bluesky : URL de post reconstruite', run.items.some(i => i.url === 'https://bsky.app/profile/nantes.bsky.social/post/3kabc'));
 ok('Reddit sans clé : lu via Atom', run.items.some(i => i.source === 'reddit' && i.title.includes('RN171')));
 ok('flux presse : nom du journal conservé', run.items.some(i => i.source === 'presse' && i.author === "L'Éclaireur de Châteaubriant"));
+ok('flux mairie Actualités intégré',
+   run.items.some(i => i.source === 'presse' && i.author === 'Mairie de Châteaubriant · Actualités'));
+ok('flux mairie Agenda intégré',
+   run.items.some(i => i.source === 'presse' && i.author === 'Mairie de Châteaubriant · Agenda'));
 
 ok('enrichissement 44 appliqué',
    run.items.some(i => i.tags?.includes('44')));
@@ -110,6 +120,8 @@ ok('tri antichronologique',
 const xml = toRSS(run.items);
 ok('flux RSS contient tous les items',
    (xml.match(/<item>/g) ?? []).length === run.items.length);
+ok('RSS nettoie les caractères de contrôle interdits',
+   !xml.includes(String.fromCharCode(2)));
 
 run.items[0].title = '<script>alert(1)</script> & co';
 const html = toHTML(run);
