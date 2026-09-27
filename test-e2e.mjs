@@ -10,6 +10,7 @@ import { search } from './radar-agent-reach.mjs';
 import { setReach } from './radar-collectors.mjs';
 import { runRegistry, toRSS } from './radar-registry.mjs';
 import { toHTML } from './radar-page.mjs';
+import { toDailyHTML, toFacebookText, buildDaily } from './radar-daily.mjs';
 
 let failed = 0;
 const ok = (n, c) => { if (!c) failed++; console.log((c ? '✓' : '✗ ÉCHEC') + ' ' + n); };
@@ -123,6 +124,18 @@ ok('flux RSS contient tous les items',
 ok('RSS nettoie les caractères de contrôle interdits',
    !xml.includes(String.fromCharCode(2)));
 
+const daily = buildDaily(run);
+const dailyHtml = toDailyHTML(run);
+const facebook = toFacebookText(run);
+ok('quotidien : sélection régionale des dernières 24 h', daily.items.length > 0);
+ok('quotidien : classement thématique présent',
+   dailyHtml.includes('Mobilité &amp; travaux') || dailyHtml.includes('Vie locale') || dailyHtml.includes('Culture &amp; sorties'));
+ok('quotidien : cahier jeux complet',
+   dailyHtml.includes('Les jeux du jour') && dailyHtml.includes('Sudoku') &&
+   dailyHtml.includes('Mots croisés du Pays') && dailyHtml.includes('Mot mêlé régional'));
+ok('quotidien : partage Facebook prêt',
+   facebook.includes('LE QUOTIDIEN DU RADAR 44') && facebook.includes('quotidien.html'));
+
 run.items[0].title = '<script>alert(1)</script> & co';
 const html = toHTML(run);
 ok('page : un <li> par item', (html.match(/<li id=/g) ?? []).length === run.items.length);
@@ -133,6 +146,7 @@ ok('page : seul le déclenchement manuel utilise fetch côté navigateur',
    html.includes("fetch('https://radar-de-niko-backend-nikoju1977s-projects.vercel.app/api/refresh'") &&
    !/XMLHttpRequest/.test(html));
 ok('page : un seul identifiant par item', new Set(html.match(/<li id="[^"]+"/g)).size === run.items.length);
+ok('page : accès au quotidien régional', html.includes('href="quotidien.html"'));
 
 ok('pwa : manifeste, service worker et icône iOS référencés',
    html.includes('rel="manifest"') && html.includes("register('sw.js')") && html.includes('apple-touch-icon'));
