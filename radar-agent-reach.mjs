@@ -297,7 +297,7 @@ export function parseRSS(xml) {
     return {
       title,
       url: decode(tag(it, 'link')).trim() || null,
-      pubDate: decode(tag(it, 'pubDate')).trim() || null,
+      pubDate: decode(tag(it, 'pubDate') ?? tag(it, 'dc:date') ?? tag(it, 'date') ?? tag(it, 'updated')).trim() || null,
       source: source || null,
       description: strip(tag(it, 'description')) || null
     };
@@ -305,16 +305,49 @@ export function parseRSS(xml) {
 }
 
 async function gnews({ query, since, limit = 50, signal }) {
-  const u = new URL('https://news.google.com/rss/search');
-  u.searchParams.set('q', since ? `${query} after:${new Date(since).toISOString().slice(0, 10)}` : query);
-  u.searchParams.set('hl', 'fr'); u.searchParams.set('gl', 'FR'); u.searchParams.set('ceid', 'FR:fr');
-  const xml = await request(u.toString(), { signal, accept: 'application/rss+xml, application/xml' , as: 'text' });
-  return parseRSS(xml).slice(0, limit);
+  const cfg = await loadSources();
+  const localQueries = Array.isArray(cfg.gnewsQueries) ? cfg.gnewsQueries : [];
+  const queries = [...new Set([query, ...localQueries].map(q => String(q ?? '').trim()).filter(Boolean))];
+  const floor = since ? new Date(since) : new Date(Date.now() - 7 * 864e5);
+  const after = floor.toISOString().slice(0, 10);
+
+  const settled = await Promise.allSettled(queries.map(async q => {
+    const u = new URL('https://news.google.com/rss/search');
+    u.searchParams.set('q', `${q} after:${after}`);
+    u.searchParams.set('hl', 'fr'); u.searchParams.set('gl', 'FR'); u.searchParams.set('ceid', 'FR:fr');
+    const xml = await request(u.toString(), {
+      signal, accept: 'application/rss+xml, application/xml', as: 'text', retries: 1
+    });
+    return parseRSS(xml);
+  }));
+
+  const ok = settled.filter(s => s.status === 'fulfilled').flatMap(s => s.value);
+  if (!ok.length && settled.length) throw settled.find(s => s.status === 'rejected')?.reason ?? new Error('Google News indisponible');
+
+  const byUrl = new Map();
+  for (const item of recent(ok, floor.toISOString())) {
+    const key = item.url || `${item.title}|${item.pubDate}`;
+    if (!byUrl.has(key)) byUrl.set(key, item);
+  }
+  return [...byUrl.values()]
+    .sort((a, b) => (Date.parse(b.pubDate) || 0) - (Date.parse(a.pubDate) || 0))
+    .slice(0, limit);
 }
 
 const FEED_ACCEPT = 'application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.5';
 const cutoff = since => since ? new Date(since).getTime() : 0;
-const recent = (items, since) => items.filter(i => !since || !i.pubDate || Date.parse(i.pubDate) >= cutoff(since));
+const recent = (items, since, maxAgeDays = null) => {
+  const explicit = cutoff(since);
+  const ageCut = Number.isFinite(Number(maxAgeDays)) && Number(maxAgeDays) > 0
+    ? Date.now() - Number(maxAgeDays) * 864e5
+    : 0;
+  const cut = Math.max(explicit, ageCut);
+  if (!cut) return items;
+  return items.filter(i => {
+    const t = Date.parse(i.pubDate);
+    return Number.isFinite(t) && t >= cut;
+  });
+};
 
 /** Bing News — RSS de recherche, sans clé. */
 async function bing({ query, since, limit = 40, signal }) {
@@ -343,14 +376,17 @@ async function feeds({ since, limit = 200, signal }) {
   const { feeds: list = [] } = await loadSources();
   const settled = await Promise.allSettled(list.map(async f => {
     const xml = await request(f.url, { signal, accept: FEED_ACCEPT, as: 'text', retries: 1 });
-    return parseRSS(xml).map(i => ({ ...i, source: i.source && !/^\/?u\//.test(i.source) ? i.source : f.name,
-                                     author: i.source, feed: f.name }));
+    return recent(parseRSS(xml), since, f.maxAgeDays ?? 14)
+      .map(i => ({ ...i, source: i.source && !/^\/?u\//.test(i.source) ? i.source : f.name,
+                   author: i.source, feed: f.name }));
   }));
   const failed = settled.map((s, i) => s.status === 'rejected' ? `${list[i].name} (${s.reason?.message ?? s.reason})` : null).filter(Boolean);
   if (failed.length === list.length && list.length) throw new Error(`tous les flux en échec : ${failed.join(' ; ')}`);
   const out = settled.flatMap(s => s.status === 'fulfilled' ? s.value : []);
   out.failedFeeds = failed;
-  return recent(out, since).slice(0, limit);
+  return out
+    .sort((a, b) => (Date.parse(b.pubDate) || 0) - (Date.parse(a.pubDate) || 0))
+    .slice(0, limit);
 }
 
 /** Session Bluesky (compte gratuit + mot de passe d'application), mise en cache. */
