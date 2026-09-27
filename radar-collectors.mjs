@@ -174,12 +174,16 @@ defineCollector({
   mode: 'enrich',                       // patche les items retenus, n'en crée aucun
   requires: SOURCES,
   collect: ({ results }) => {
-    const TERMS = /(loire[- ]atlantique|nantes|nantais|saint-nazaire|châteaubriant|chateaubriant|ancenis|blain|nozay|meilleraye|derval|guémené|guemene|moisdon|issé|erbray|rougé|sion-les-mines|saffré|héric|clisson|pornic|la baule|guérande|#?loireatlantique|\b44\b)/i;
+    const TERMS = /(?:^|[^a-z])(loire[- ]atlantique|nantes|nantais|saint[- ]nazaire|chateaubriant|ancenis|blain|nozay|meilleraye|derval|guemene|moisdon|isse|erbray|sion[- ]les[- ]mines|saffre|heric|clisson|pornic|la baule|guerande|reze|saint[- ]herblain|orvault|vertou|bouguenais|carquefou|pontchateau|saint[- ]brevin|montoir|savenay|coueron|loireatlantique|44)(?:[^a-z]|$)/i;
     const pool = SOURCES
       .flatMap(id => results.get(id)?.items ?? []);
 
     return pool
-      .filter(i => TERMS.test(`${i.title} ${i.summary ?? ''}`))
+      .filter(i => {
+        const raw = `${i.title} ${i.summary ?? ''}`;
+        const folded = raw.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+        return TERMS.test(folded) || /rougé/i.test(raw);
+      })
       .map(i => ({ id: i.id, patch: { tags: ['44'], local: true } }));
   }
 });
