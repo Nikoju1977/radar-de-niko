@@ -19,7 +19,13 @@ const fetchImpl=async url=>{
     time:['2026-09-30T00:00','2026-09-30T01:00','2026-09-30T02:00','2026-09-30T03:00','2026-09-30T04:00','2026-09-30T05:00','2026-09-30T06:00'],
     sea_level_height_msl:[0,1,2,1,0,-1,0]
   }});
-  if(u.includes('vigicrues.gouv.fr')) return json({features:[{properties:{NomEntVigiCru:'Loire aval',NivVigi:2}},{properties:{name:'Autre bassin',NivVigi:1}}]});
+  if(u.includes('vigicrues.gouv.fr/services/1/InfoVigiCru.geojson')) return json({features:[
+    {properties:{CdEntCru:'ML14',lbentcru:'Loire aval',NivInfViCr:2}},
+    {properties:{CdEntCru:'ML15',lbentcru:'Loire estuaire',NivInfViCr:1}},
+    {properties:{CdEntCru:'ML18',lbentcru:'Sèvre Nantaise aval',NivInfViCr:1}},
+    {properties:{CdEntCru:'BT6',lbentcru:'Vilaine aval',NivInfViCr:1}},
+    {properties:{CdEntCru:'XX1',lbentcru:'Bassin hors 44',NivInfViCr:4}}
+  ]});
   if(u.includes('sncf-siri-lite-situation-exchange')) return text('<Siri><PtSituationElement><Summary>Perturbation TER Nantes Saint-Nazaire</Summary><Description>Retard de 15 minutes</Description></PtSituationElement></Siri>');
   if(u.includes('fluidite-axes-routiers')) return json({total_count:889,results:[{etat:'fluide'}]});
   if(u.includes('prix-des-carburants')) return json({results:[
@@ -43,7 +49,8 @@ ok('météo multi-villes',s.weather.status==='ok'&&s.weather.locations.length===
 ok('soleil inclus dans la météo',Boolean(s.weather.locations[0].sunrise&&s.weather.locations[0].sunset));
 ok('air européen',s.air.status==='ok'&&s.air.aqi===27&&s.air.label==='Correct');
 ok('vigilance dégrade proprement sans secret',s.vigilance.status==='unconfigured');
-ok('Vigicrues connecté',s.floods.status==='ok'&&s.floods.count>=1);
+ok('Vigicrues connecté',s.floods.status==='ok'&&s.floods.count===4&&s.floods.level===2);
+ok('Vigicrues limité aux tronçons utiles au 44',s.floods.names.includes('Loire aval')&&s.floods.names.includes('Loire estuaire')&&s.floods.names.includes('Sèvre Nantaise aval')&&s.floods.names.includes('Vilaine aval')&&!s.floods.names.includes('Bassin hors 44'));
 ok('transport SNCF + Radar',s.transport.status==='ok'&&s.transport.alerts.length>=1&&s.transport.radar.length>=1);
 ok('trafic détecté',s.traffic.status==='ok'&&s.traffic.items.length>=1);
 ok('carburants officiels agrégés',s.fuel.status==='ok'&&s.fuel.fuels.some(x=>x.name==='Gazole'&&x.min===1.68));
