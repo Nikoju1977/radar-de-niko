@@ -309,12 +309,14 @@ export function parseRSS(xml) {
                 ?? e.match(/<link\b[^>]*href=["']([^"']+)/i)?.[1] ?? '') || null,
       pubDate: decode(tag(e, 'published') ?? tag(e, 'updated')).trim() || null,
       source: strip(tag(tag(e, 'author') ?? '', 'name')) || null,
+      author: strip(tag(tag(e, 'author') ?? '', 'name')) || null,
       description: strip(tag(e, 'content') ?? tag(e, 'summary')).slice(0, 800) || null,
       imageUrl: imageFromXml(e)
     }));
   }
   return [...src.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(([, it]) => {
     const source = strip(tag(it, 'source'));
+    const author = strip(tag(it, 'dc:creator') ?? tag(it, 'author')) || null;
     let title = strip(tag(it, 'title'));
     if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -source.length - 3);
     return {
@@ -322,6 +324,7 @@ export function parseRSS(xml) {
       url: decode(tag(it, 'link')).trim() || null,
       pubDate: decode(tag(it, 'pubDate') ?? tag(it, 'dc:date') ?? tag(it, 'date') ?? tag(it, 'updated')).trim() || null,
       source: source || null,
+      author,
       description: strip(tag(it, 'description')) || null,
       imageUrl: imageFromXml(it)
     };
@@ -428,7 +431,7 @@ async function feeds({ since, limit = 200, signal }) {
     const xml = await request(f.url, { signal, accept: FEED_ACCEPT, as: 'text', retries: 1 });
     return recent(parseRSS(xml), since, f.maxAgeDays ?? 14)
       .map(i => ({ ...i, source: i.source && !/^\/?u\//.test(i.source) ? i.source : f.name,
-                   author: i.source, feed: f.name }));
+                   author: i.author || i.source, feed: f.name, media: f.name }));
   }));
   const failed = settled.map((s, i) => s.status === 'rejected' ? `${list[i].name} (${s.reason?.message ?? s.reason})` : null).filter(Boolean);
   if (failed.length === list.length && list.length) throw new Error(`tous les flux en échec : ${failed.join(' ; ')}`);
