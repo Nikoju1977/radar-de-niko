@@ -176,7 +176,10 @@ const seriousNote = nikoNote({ items:[
 ok('quotidien : humour neutralisé sur un fait grave', /sobriété/i.test(seriousNote));
 ok('quotidien : contexte V3 affiché', dailyHtml.includes('Événements V3') && dailyHtml.includes('edition-stats'));
 ok('quotidien : La note de Niko présente', dailyHtml.includes('La note de Niko') && nikoNote(daily).length > 20);
+ok('quotidien : billet satirique rendu et clairement étiqueté',
+   dailyHtml.includes('Le billet satirique du jour') && dailyHtml.includes('Satire ·'));
 ok('facebook : La note de Niko présente', facebook.includes('LA NOTE DE NIKO'));
+ok('facebook : teaser du billet satirique présent', facebook.includes('LE BILLET SATIRIQUE'));
 
 run.items[0].title = '<script>alert(1)</script> & co';
 const html = toHTML(run);

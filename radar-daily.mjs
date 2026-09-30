@@ -5,6 +5,7 @@
 import { toGamesHTML } from './radar-games.mjs';
 import { buildRadarV3, mediaFor, journalistFor } from './radar-v3.mjs';
 import { servicesPanel, servicesFacebookLine, SERVICES_CSS } from './radar-services-view.mjs';
+import { buildSatiricalArticle } from './radar-satire.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -150,6 +151,8 @@ export function toFacebookText(run, {
   const practicalLine = servicesFacebookLine(services);
   if (practicalLine) lines.push(practicalLine, '');
   lines.push('LA NOTE DE NIKO — ' + nikoNote(d), '');
+  const satire = buildSatiricalArticle(d.items, { themeFor, now:d.now });
+  if (satire) lines.push('LE BILLET SATIRIQUE — ' + satire.headline, '');
   const seenEvents = new Set();
   for (const [theme, items] of d.groups) {
     const unique = [];
@@ -200,6 +203,7 @@ export function toDailyHTML(run, {
   const d = buildDaily(run, Date.now(), v3Graph);
   const lead = d.lead;
   const note = nikoNote(d);
+  const satire = buildSatiricalArticle(d.items, { themeFor, now:d.now });
   const eventById = new Map(d.graph.events.map(e => [e.id, e]));
   const eventFor = i => eventById.get(d.graph.articleToEvent[i.id]);
   const leadEvent = lead ? eventFor(lead) : null;
@@ -281,7 +285,7 @@ h1{font:900 clamp(46px,9vw,92px)/.82 Georgia,serif;letter-spacing:-.055em;margin
 .story-meta{display:flex;gap:9px;flex-wrap:wrap;align-items:center;color:var(--red);font:700 10px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em}
 .story-meta .multi{border:1px solid var(--red);padding:2px 5px;text-decoration:none;color:var(--red)}
 .edition-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink);border:1px solid var(--ink);margin:0 0 20px}.edition-stats div{background:var(--cream);padding:10px;text-align:center;font:700 11px Arial,sans-serif;text-transform:uppercase}.edition-stats b{display:block;font:900 24px Georgia,serif;color:var(--red)}
-.niko-note{margin:22px 0 28px;border:3px double var(--ink);padding:16px 20px;background:var(--cream);position:relative}.niko-note:before{content:'N';position:absolute;right:14px;top:-8px;font:900 74px/1 Georgia,serif;color:rgba(152,42,32,.08)}.niko-note h2{font:900 25px/1 Georgia,serif;margin:3px 0 8px}.niko-note p{font:italic 18px/1.5 Georgia,serif;margin:0;max-width:850px}
+.niko-note{margin:22px 0 28px;border:3px double var(--ink);padding:16px 20px;background:var(--cream);position:relative}.niko-note:before{content:'N';position:absolute;right:14px;top:-8px;font:900 74px/1 Georgia,serif;color:rgba(152,42,32,.08)}.niko-note h2{font:900 25px/1 Georgia,serif;margin:3px 0 8px}.niko-note p{font:italic 18px/1.5 Georgia,serif;margin:0;max-width:850px}.satire{margin:34px 0;padding:26px clamp(18px,4vw,42px);background:#171512;color:#fbf7ed;border-top:7px double #fbf7ed;border-bottom:7px double #fbf7ed}.satire .kicker{color:#e4a69c}.satire h2{font:900 clamp(34px,5vw,58px)/.98 Georgia,serif;letter-spacing:-.035em;margin:7px 0 10px;max-width:900px}.satire .satire-deck{font:italic 18px/1.45 Georgia,serif;color:#d8d0c3;max-width:820px;margin:0 0 20px}.satire .satire-body{columns:2 340px;column-gap:34px}.satire .satire-body p{font-size:17px;line-height:1.62;margin:0 0 16px;break-inside:avoid}.satire .satire-meta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;border-top:1px solid #5c554d;padding-top:13px;margin-top:8px;font:700 10px Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:#d8d0c3}.satire .satire-meta a{color:#fbf7ed}.satire .satire-label{border:1px solid #e4a69c;color:#e4a69c;padding:3px 6px}
 .story h3{font:800 21px/1.13 Georgia,serif;margin:5px 0}
 .story h3 a{color:var(--ink);text-decoration:none}.story h3 a:hover{text-decoration:underline}
 .story p{color:var(--muted);margin:6px 0 0;font-size:14px}
@@ -304,12 +308,12 @@ details{margin-top:12px;border-top:1px solid var(--rule);padding-top:8px}summary
 .empty{padding:50px 0;color:var(--muted)}
 footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:var(--muted);font-size:12px}
 .toast{position:fixed;right:16px;bottom:16px;background:var(--ink);color:var(--cream);padding:10px 14px;font:700 13px Arial,sans-serif;z-index:10}
-@media(max-width:720px){.lead{grid-template-columns:1fr}.lead-side{border-left:0;border-top:1px solid var(--rule);padding:12px 0 0}.game-grid{grid-template-columns:1fr}.game.wide{grid-column:auto}.columns{columns:1}.topline{font-size:9px}.edition-stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.satire .satire-body{columns:1}.lead{grid-template-columns:1fr}.lead-side{border-left:0;border-top:1px solid var(--rule);padding:12px 0 0}.game-grid{grid-template-columns:1fr}.game.wide{grid-column:auto}.columns{columns:1}.topline{font-size:9px}.edition-stats{grid-template-columns:repeat(2,1fr)}}
 @page{size:A4;margin:11mm 10mm 13mm}
 @media print{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   html{background:#fff;font-size:10pt}body{max-width:none;padding:0;background:#fff;line-height:1.36}
-  .actions,.toc,.toast{display:none!important}.mast{padding:4mm 0 3mm}.brand-mark{width:12mm;height:12mm;margin-bottom:2mm}.edition-stats{margin-bottom:4mm}.niko-note{break-inside:avoid;padding:4mm;margin:5mm 0}
+  .actions,.toc,.toast{display:none!important}.mast{padding:4mm 0 3mm}.satire{break-inside:avoid;background:#fff;color:#000;border-color:#000;padding:5mm}.satire .kicker,.satire .satire-label{color:#000;border-color:#000}.satire .satire-deck,.satire .satire-meta{color:#333}.satire .satire-body{columns:2}.satire .satire-meta a{color:#000}.brand-mark{width:12mm;height:12mm;margin-bottom:2mm}.edition-stats{margin-bottom:4mm}.niko-note{break-inside:avoid;padding:4mm;margin:5mm 0}
   h1{font-size:38pt;line-height:.88}.deck{font-size:9.5pt}.topline{font-size:7.5pt}
   .lead{gap:5mm;padding:4mm 0 5mm}.lead h2{font-size:27pt}.lead .summary{font-size:11pt;line-height:1.4}.lead-photo{max-height:62mm;aspect-ratio:16/7}
   .theme{break-inside:auto;margin-top:6mm}.theme>h2{font-size:18pt;padding:2mm 0;margin-bottom:3mm}
@@ -333,6 +337,7 @@ footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:v
     <button type="button" id="share">Partager</button>
     <button type="button" id="pdf">Exporter PDF</button>
     <a href="${esc(facebookUrl)}" download>Texte Facebook</a>
+    ${satire ? '<a href="#billet-niko">Billet satirique ↓</a>' : ''}
     <a href="#jeux">Jeux du jour ↓</a>
   </div>
 </header>
@@ -341,9 +346,10 @@ footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:v
 ${servicesPanel(services)}
 ${lead ? `<section class="lead">${storyPhoto(lead, "lead-photo", true)}<div><div class="kicker">À la une</div><h2><a href="${esc(lead.url)}" target="_blank" rel="noopener">${esc(lead.title)}</a></h2><p class="summary">${esc(lead.summary || 'Retrouvez l’article complet auprès de la source originale.')}</p></div><aside class="lead-side"><strong>${esc(themeFor(lead))}</strong><p>${esc(mediaFor(lead))}${journalistFor(lead) ? ' · ' + esc(journalistFor(lead)) : ''}</p><p>Publié à ${esc(TIME.format(new Date(lead.publishedAt)))}</p>${eventFor(lead)?.multiSource ? `<p><a href="v3/#${esc(eventFor(lead).id)}">${eventFor(lead).sourceCount} sources suivent ce sujet →</a></p>` : ''}<a href="${esc(lead.url)}" target="_blank" rel="noopener">Lire la source →</a></aside></section>` : ''}
 <aside class="niko-note"><div class="kicker">Chronique légère</div><h2>La note de Niko</h2><p>${esc(note)}</p></aside>
+${satire ? `<section class="satire" id="billet-niko"><div class="kicker">Le billet satirique du jour</div><h2>${esc(satire.headline)}</h2><p class="satire-deck">${esc(satire.deck)}</p><div class="satire-body">${satire.paragraphs.map(p=>`<p>${esc(p)}</p>`).join('')}</div><div class="satire-meta"><span class="satire-label">Satire · ${satire.readMinutes} min</span><span>${esc(satire.theme)}</span><a href="${esc(satire.sourceUrl)}" target="_blank" rel="noopener">Point de départ factuel : ${esc(satire.sourceTitle)} →</a></div></section>` : ''}
 <main>${sections || '<p class="empty">Aucune information régionale des dernières 24 heures pour cette édition.</p>'}</main>
 ${toGamesHTML(dayKey)}
-<footer>Le Quotidien du Radar 44 est une édition automatique de veille. Les titres, extraits et liens renvoient vers leurs sources d’origine. Les données pratiques proviennent de services ouverts ou officiels et peuvent être temporairement indisponibles. « La note de Niko » est une touche humoristique générée à partir des thèmes de l’édition et désactivée sur les sujets graves. Jeux générés localement pour cette édition.</footer>
+<footer>Le Quotidien du Radar 44 est une édition automatique de veille. Les titres, extraits et liens renvoient vers leurs sources d’origine. Les données pratiques proviennent de services ouverts ou officiels et peuvent être temporairement indisponibles. « La note de Niko » est une touche humoristique générée à partir des thèmes de l’édition et désactivée sur les sujets graves. Le « billet satirique du jour » est une chronique clairement séparée de l’information factuelle ; il ne sélectionne ni sujets graves, ni affaires judiciaires, ni santé, ni politique. Jeux générés localement pour cette édition.</footer>
 <script>
 (function(){
   var text=${shareJson};
