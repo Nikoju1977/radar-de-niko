@@ -151,28 +151,123 @@ function normalizeItem(item, collector) {
   };
 }
 
+const DEDUPE_STOP = new Set(
+  'a au aux avec ce ces dans de des du en et la le les pour par sur un une est sont cette son sa ses qui que après apres avant'.split(' ')
+);
+
+function foldDedupe(s) {
+  return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function titleTokens(title) {
+  return new Set(foldDedupe(title).split(' ').filter(x => x.length > 2 && !DEDUPE_STOP.has(x)));
+}
+
+function titleSimilarity(a, b) {
+  const aa = titleTokens(a), bb = titleTokens(b);
+  if (!aa.size || !bb.size) return 0;
+  let common = 0;
+  for (const x of aa) if (bb.has(x)) common++;
+  return common / (aa.size + bb.size - common);
+}
+
+function mediaKey(item) {
+  const media = item.media
+    || (/^(presse|gnews|bing)$/.test(item.source ?? '') ? item.author : null)
+    || item.source
+    || '';
+  return foldDedupe(media);
+}
+
+function duplicateReason(a, b) {
+  if (a.id === b.id) return 'canonical-url';
+  if (!mediaKey(a) || mediaKey(a) !== mediaKey(b)) return null;
+
+  const ta = Date.parse(a.publishedAt), tb = Date.parse(b.publishedAt);
+  if (Number.isFinite(ta) && Number.isFinite(tb) && Math.abs(ta - tb) > 36 * 3600e3) return null;
+
+  const na = foldDedupe(a.title), nb = foldDedupe(b.title);
+  if (na === nb) return 'same-media-title';
+
+  const short = na.length <= nb.length ? na : nb;
+  const long = na.length > nb.length ? na : nb;
+  if (short.length >= 24 && long.includes(short) && short.length / long.length >= 0.84)
+    return 'same-media-contained-title';
+
+  const sim = titleSimilarity(a.title, b.title);
+  if (sim >= 0.88 && Math.min(titleTokens(a.title).size, titleTokens(b.title).size) >= 4)
+    return 'same-media-near-title';
+
+  return null;
+}
+
+function itemQuality(item) {
+  let score = 0;
+  if (item.source === 'presse') score += 30;      // flux direct > agrégateur
+  if (item.source === 'gnews') score += 15;
+  if (item.source === 'bing') score += 10;
+  if (item.author && mediaKey(item) !== foldDedupe(item.author)) score += 6;
+  if (item.summary) score += Math.min(8, item.summary.length / 100);
+  if (item.imageUrl) score += 3;
+  return score;
+}
+
+function mergeDuplicate(a, b) {
+  const preferred = itemQuality(b) > itemQuality(a) ? b : a;
+  const other = preferred === a ? b : a;
+  const earliest = new Date(a.publishedAt) <= new Date(b.publishedAt) ? a.publishedAt : b.publishedAt;
+  return {
+    ...preferred,
+    publishedAt: earliest,
+    author: preferred.author || other.author,
+    media: preferred.media || other.media,
+    summary: preferred.summary || other.summary,
+    imageUrl: preferred.imageUrl || other.imageUrl,
+    score: preferred.score ?? other.score
+  };
+}
+
 function dedupe(items) {
-  const seen = new Map();
-  const dupes = [];
-  const mergeRich = (primary, secondary) => ({
-    ...primary,
-    author: primary.author || secondary.author,
-    media: primary.media || secondary.media,
-    summary: primary.summary || secondary.summary,
-    imageUrl: primary.imageUrl || secondary.imageUrl,
-    score: primary.score ?? secondary.score
-  });
+  const groups = [];
+
   for (const it of items) {
-    const prev = seen.get(it.id);
-    if (!prev) { seen.set(it.id, it); continue; }
-    dupes.push({ id: it.id, kept: prev.collector, dropped: it.collector });
-    // On garde la première publication, tout en récupérant les métadonnées plus riches
-    // (notamment l'image) trouvées par une autre source.
-    seen.set(it.id, new Date(it.publishedAt) < new Date(prev.publishedAt)
-      ? mergeRich(it, prev)
-      : mergeRich(prev, it));
+    let group = null;
+    let reason = null;
+
+    for (const g of groups) {
+      reason = duplicateReason(g.item, it);
+      if (reason) { group = g; break; }
+    }
+
+    if (!group) {
+      groups.push({ item: it, keptRef: it, members: [it] });
+      continue;
+    }
+
+    group.members.push(it);
+    if (itemQuality(it) > itemQuality(group.keptRef)) group.keptRef = it;
+    group.item = mergeDuplicate(group.item, it);
   }
-  return { items: [...seen.values()], dupes };
+
+  const dupes = [];
+  for (const g of groups) {
+    const kept = g.item;
+    for (const member of g.members) {
+      if (member === g.keptRef) continue;
+      const reason = duplicateReason(kept, member) || 'duplicate';
+      dupes.push({
+        id: member.id,
+        keptId: kept.id,
+        droppedId: member.id,
+        kept: kept.collector,
+        dropped: member.collector,
+        reason
+      });
+    }
+  }
+
+  return { items: groups.map(g => g.item), dupes };
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -283,6 +378,12 @@ export async function runRegistry({ query = '', since = null, filter = null, log
 
   // Les enrichisseurs patchent les items retenus, ils n'en créent pas de nouveaux.
   const index = new Map(unique.map(i => [i.id, i]));
+  // Un enrichisseur peut avoir vu l'une des URLs éliminées : ses patches
+  // doivent tout de même atteindre l'article conservé.
+  for (const d of dupes) {
+    const target = index.get(d.keptId);
+    if (target && d.droppedId) index.set(d.droppedId, target);
+  }
   let applied = 0, orphan = 0;
   for (const r of reports) {
     for (const p of r.patches ?? []) {

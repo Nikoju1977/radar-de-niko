@@ -1,4 +1,4 @@
-import { defineCollector, resetRegistry, validate, runRegistry, toRSS, levels } from './radar-registry.mjs';
+import { defineCollector, resetRegistry, validate, runRegistry, toRSS, levels, stableId } from './radar-registry.mjs';
 let failed=0;
 const ok=(n,c)=>{ if(!c) failed++; console.log((c?'✓':'✗ ÉCHEC')+' '+n); };
 process.on('exit', code => {
@@ -99,3 +99,38 @@ defineCollector({id:'morte',name:'M',source:'m',version:'1',retries:0,collect:()
 defineCollector({id:'tag',name:'T',source:'t',version:'1',mode:'enrich',requires:['morte'],collect:()=>[]});
 r=await runRegistry({});
 ok('enrichisseur sauté si aucune source vivante', r.reports.find(x=>x.collector.id==='tag').status==='skipped');
+
+
+// 13. doublons d'un même média avec URLs différentes
+resetRegistry();
+const duplicateUrlA = 'https://aggregator.test/article-123';
+const duplicateUrlB = 'https://media.test/article-123';
+defineCollector({id:'agg',name:'Agrégateur',source:'gnews',version:'1',collect:()=>[
+  {title:'Derval : une nouvelle boulangerie ouvre ses portes',url:duplicateUrlA,
+   media:'Le Journal Test',author:'Le Journal Test',publishedAt:'2026-09-30T08:00:00Z'}]});
+defineCollector({id:'direct',name:'Flux direct',source:'presse',version:'1',collect:()=>[
+  {title:'Derval : une nouvelle boulangerie ouvre ses portes',url:duplicateUrlB,
+   media:'Le Journal Test',author:'Alice Reporter',publishedAt:'2026-09-30T08:05:00Z',
+   summary:'Ouverture annoncée ce matin à Derval.'}]});
+defineCollector({id:'alias-tag',name:'Alias tag',source:'tag',version:'1',mode:'enrich',requires:['agg','direct'],
+  collect:()=>[{id:stableId(duplicateUrlA),patch:{tags:['alias-ok']}}]});
+r=await runRegistry({});
+ok('déduplication même média malgré deux URLs', r.items.length===1 && r.dupes.length===1);
+ok('déduplication conserve la version directe la plus riche',
+   r.items[0].source==='presse' && r.items[0].author==='Alice Reporter' && /Ouverture/.test(r.items[0].summary));
+ok('patch d\'un URL dupliqué redirigé vers l\'article conservé',
+   r.items[0].tags?.includes('alias-ok'));
+ok('raison de doublon exposée',
+   r.dupes[0]?.reason==='same-media-title');
+
+// 14. deux médias différents couvrant le même événement restent distincts
+resetRegistry();
+defineCollector({id:'media-a',name:'A',source:'presse',version:'1',collect:()=>[
+  {title:'Nantes : le pont Bellevue fermé après un incident',url:'https://a.test/pont',
+   media:'Média A',publishedAt:'2026-09-30T08:00:00Z'}]});
+defineCollector({id:'media-b',name:'B',source:'presse',version:'1',collect:()=>[
+  {title:'Incident à Nantes : le pont Bellevue est fermé',url:'https://b.test/pont',
+   media:'Média B',publishedAt:'2026-09-30T08:10:00Z'}]});
+r=await runRegistry({});
+ok('multi-source préservé : deux médias ne sont pas dédupliqués',
+   r.items.length===2 && r.dupes.length===0);
