@@ -97,9 +97,15 @@ export function toFacebookText(run, {
   return lines.join('\n');
 }
 
-function articleRow(i, leadId=null) {
+function storyPhoto(i, cls="story-photo", eager=false) {
+  if (!i?.imageUrl) return "";
+  return `<figure class="${cls}"><img src="${esc(i.imageUrl)}" alt="${esc(i.title)}" loading="${eager ? "eager" : "lazy"}" decoding="async" referrerpolicy="no-referrer" onerror="this.parentElement.remove()"></figure>`;
+}
+
+function articleRow(i, leadId=null, showPhoto=true) {
   if (i.id === leadId) return '';
   return `<article class="story">
+    ${showPhoto ? storyPhoto(i) : ''}
     <div class="story-meta"><time datetime="${esc(i.publishedAt)}">${esc(TIME.format(new Date(i.publishedAt)))}</time><span>${esc(i.author || i.source)}</span></div>
     <h3><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
     ${i.summary ? `<p>${esc(i.summary.slice(0, 300))}</p>` : ''}
@@ -113,8 +119,13 @@ export function toDailyHTML(run, {
 } = {}) {
   const d = buildDaily(run);
   const lead = d.lead;
+  let photoBudget = 8;
   const sections = [...d.groups.entries()].filter(([, items]) => items.some(i => i.id !== lead?.id)).map(([theme, items]) => {
-    const body=items.map(i=>articleRow(i,lead?.id)).join('');
+    const body=items.map(i => {
+      const usePhoto = i.id !== lead?.id && Boolean(i.imageUrl) && photoBudget > 0;
+      if (usePhoto) photoBudget--;
+      return articleRow(i, lead?.id, usePhoto);
+    }).join('');
     return `<section class="theme" id="${slug(theme)}"><h2>${esc(theme)} <span>${items.length}</span></h2><div class="columns">${body}</div></section>`;
   }).join('');
   const toc=[...d.groups.entries()].filter(([,items])=>items.length).map(([theme,items])=>
@@ -139,6 +150,7 @@ export function toDailyHTML(run, {
 body{max-width:1120px;margin:0 auto;background:var(--paper);min-height:100vh;padding:24px clamp(16px,4vw,54px) 64px}
 .topline{display:flex;justify-content:space-between;gap:16px;border-block:1px solid var(--ink);padding:6px 0;font:700 11px/1.2 Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em}
 .mast{text-align:center;padding:17px 0 12px;border-bottom:5px double var(--ink)}
+.brand-mark{width:48px;height:48px;display:block;margin:0 auto 8px;border-radius:10px;object-fit:cover}
 .kicker{font:700 11px Arial,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--red)}
 h1{font:900 clamp(46px,9vw,92px)/.82 Georgia,serif;letter-spacing:-.055em;margin:8px 0}
 .deck{margin:9px auto 0;max-width:760px;color:var(--muted);font-style:italic}
@@ -152,6 +164,9 @@ h1{font:900 clamp(46px,9vw,92px)/.82 Georgia,serif;letter-spacing:-.055em;margin
 .lead h2{font:900 clamp(34px,5vw,60px)/.98 Georgia,serif;letter-spacing:-.035em;margin:4px 0 12px}
 .lead h2 a{color:var(--ink);text-decoration:none}
 .lead .summary{font-size:18px;line-height:1.55;margin:0}
+.lead-photo{grid-column:1/-1;margin:0 0 4px;overflow:hidden;background:#ddd;aspect-ratio:16/7}
+.lead-photo img,.story-photo img{display:block;width:100%;height:100%;object-fit:cover}
+.story-photo{margin:0 0 9px;overflow:hidden;background:#ddd;aspect-ratio:16/9}
 .lead-side{border-left:1px solid var(--rule);padding-left:20px}
 .lead-side strong{display:block;font:800 12px Arial,sans-serif;text-transform:uppercase;color:var(--red);margin-bottom:8px}
 .lead-side p{color:var(--muted);margin:0 0 12px}
@@ -184,11 +199,24 @@ details{margin-top:12px;border-top:1px solid var(--rule);padding-top:8px}summary
 footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:var(--muted);font-size:12px}
 .toast{position:fixed;right:16px;bottom:16px;background:var(--ink);color:var(--cream);padding:10px 14px;font:700 13px Arial,sans-serif;z-index:10}
 @media(max-width:720px){.lead{grid-template-columns:1fr}.lead-side{border-left:0;border-top:1px solid var(--rule);padding:12px 0 0}.game-grid{grid-template-columns:1fr}.game.wide{grid-column:auto}.columns{columns:1}.topline{font-size:9px}}
-@media print{html{background:#fff}body{max-width:none;padding:0;background:#fff}.actions{display:none}.toc{break-after:avoid}.theme{break-inside:auto}.story{break-inside:avoid}.games{page-break-before:always}.toast{display:none}a{color:#000!important}}
+@page{size:A4;margin:11mm 10mm 13mm}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html{background:#fff;font-size:10pt}body{max-width:none;padding:0;background:#fff;line-height:1.36}
+  .actions,.toc,.toast{display:none!important}.mast{padding:4mm 0 3mm}.brand-mark{width:12mm;height:12mm;margin-bottom:2mm}
+  h1{font-size:38pt;line-height:.88}.deck{font-size:9.5pt}.topline{font-size:7.5pt}
+  .lead{gap:5mm;padding:4mm 0 5mm}.lead h2{font-size:27pt}.lead .summary{font-size:11pt;line-height:1.4}.lead-photo{max-height:62mm;aspect-ratio:16/7}
+  .theme{break-inside:auto;margin-top:6mm}.theme>h2{font-size:18pt;padding:2mm 0;margin-bottom:3mm}
+  .columns{columns:initial;display:grid;grid-template-columns:1fr 1fr;column-gap:7mm;column-rule:0}
+  .story{break-inside:avoid;page-break-inside:avoid;padding-bottom:3mm;margin-bottom:3mm}.story h3{font-size:13pt}.story p{font-size:9pt;line-height:1.35}.story-photo{height:31mm;aspect-ratio:auto}
+  .games{page-break-before:always;margin-top:0;padding-top:4mm}.game{break-inside:avoid;page-break-inside:avoid}
+  footer{margin-top:7mm;font-size:7.5pt}a{color:#000!important;text-decoration:none!important}
+}
 </style>
 </head><body>
 <div class="topline"><span>Loire-Atlantique · Pays de Châteaubriant</span><span>Édition automatique · ${esc(TIME.format(new Date(d.now)))}</span></div>
 <header class="mast">
+  <img class="brand-mark" src="icons/icon-192.png" alt="Radar 44" width="48" height="48">
   <div class="kicker">Toute l’actualité régionale des dernières 24 heures</div>
   <h1>${esc(title)}</h1>
   <p class="deck">${esc(DATE.format(new Date(d.now)))} · ${d.items.length} informations retenues et classées par thématiques</p>
@@ -196,23 +224,35 @@ footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:v
     <a href="${esc(home)}">← Radar en direct</a>
     <button type="button" class="primary" id="copy">Copier pour Facebook</button>
     <button type="button" id="share">Partager</button>
-    <button type="button" onclick="print()">Imprimer / PDF</button>
+    <button type="button" id="pdf">Exporter PDF</button>
     <a href="${esc(facebookUrl)}" download>Texte Facebook</a>
     <a href="#jeux">Jeux du jour ↓</a>
   </div>
 </header>
 <nav class="toc" aria-label="Sommaire">${toc}</nav>
-${lead ? `<section class="lead"><div><div class="kicker">À la une</div><h2><a href="${esc(lead.url)}" target="_blank" rel="noopener">${esc(lead.title)}</a></h2><p class="summary">${esc(lead.summary || 'Retrouvez l’article complet auprès de la source originale.')}</p></div><aside class="lead-side"><strong>${esc(themeFor(lead))}</strong><p>${esc(lead.author || lead.source)}</p><p>Publié à ${esc(TIME.format(new Date(lead.publishedAt)))}</p><a href="${esc(lead.url)}" target="_blank" rel="noopener">Lire la source →</a></aside></section>` : ''}
+${lead ? `<section class="lead">${storyPhoto(lead, "lead-photo", true)}<div><div class="kicker">À la une</div><h2><a href="${esc(lead.url)}" target="_blank" rel="noopener">${esc(lead.title)}</a></h2><p class="summary">${esc(lead.summary || 'Retrouvez l’article complet auprès de la source originale.')}</p></div><aside class="lead-side"><strong>${esc(themeFor(lead))}</strong><p>${esc(lead.author || lead.source)}</p><p>Publié à ${esc(TIME.format(new Date(lead.publishedAt)))}</p><a href="${esc(lead.url)}" target="_blank" rel="noopener">Lire la source →</a></aside></section>` : ''}
 <main>${sections || '<p class="empty">Aucune information régionale des dernières 24 heures pour cette édition.</p>'}</main>
 ${toGamesHTML(dayKey)}
 <footer>Le Quotidien du Radar 44 est une édition automatique de veille. Les titres, extraits et liens renvoient vers leurs sources d’origine. Jeux générés localement pour cette édition.</footer>
 <script>
 (function(){
   var text=${shareJson};
-  var copy=document.getElementById('copy'),share=document.getElementById('share');
+  var copy=document.getElementById('copy'),share=document.getElementById('share'),pdf=document.getElementById('pdf');
   function toast(t){var x=document.createElement('div');x.className='toast';x.textContent=t;document.body.appendChild(x);setTimeout(function(){x.remove();},2200);}
   copy.addEventListener('click',async function(){try{await navigator.clipboard.writeText(text);toast('Texte Facebook copié');}catch(e){toast('Copie non disponible');}});
   share.addEventListener('click',async function(){if(navigator.share){try{await navigator.share({title:'Le Quotidien du Radar 44',text:text,url:location.href});}catch(e){}}else{try{await navigator.clipboard.writeText(text);toast('Texte copié : colle-le dans Facebook');}catch(e){toast('Partage non disponible');}}});
+  var oldTitle=document.title;
+  async function exportPdf(){
+    if(!pdf)return; pdf.disabled=true; toast('Préparation du PDF…');
+    var imgs=[].slice.call(document.querySelectorAll('.lead-photo img,.story-photo img'));
+    imgs.forEach(function(img){img.loading='eager';try{img.fetchPriority='high';}catch(e){}});
+    var ready=Promise.all(imgs.map(function(img){if(img.complete)return Promise.resolve();return new Promise(function(resolve){img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});});}));
+    await Promise.race([ready,new Promise(function(resolve){setTimeout(resolve,2500);})]);
+    document.title='Radar-44-'+new Date().toISOString().slice(0,10);
+    window.print();
+  }
+  if(pdf)pdf.addEventListener('click',exportPdf);
+  window.addEventListener('afterprint',function(){document.title=oldTitle;if(pdf)pdf.disabled=false;});
 })();
 </script>
 </body></html>`;
