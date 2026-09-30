@@ -48,6 +48,7 @@ jobs:
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+          METEOFRANCE_API_TOKEN: ${{ secrets.METEOFRANCE_API_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p .radar-state
