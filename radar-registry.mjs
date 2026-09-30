@@ -241,11 +241,12 @@ function dedupe(items) {
     }
 
     if (!group) {
-      groups.push({ item: it, members: [it] });
+      groups.push({ item: it, keptRef: it, members: [it] });
       continue;
     }
 
     group.members.push(it);
+    if (itemQuality(it) > itemQuality(group.keptRef)) group.keptRef = it;
     group.item = mergeDuplicate(group.item, it);
   }
 
@@ -253,7 +254,7 @@ function dedupe(items) {
   for (const g of groups) {
     const kept = g.item;
     for (const member of g.members) {
-      if (member === kept) continue;
+      if (member === g.keptRef) continue;
       const reason = duplicateReason(kept, member) || 'duplicate';
       dupes.push({
         id: member.id,
