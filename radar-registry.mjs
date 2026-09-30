@@ -13,7 +13,7 @@
  *   })
  *
  * ctx = { query, since, results, log, signal }
- * item brut attendu : { title, url, publishedAt, author?, summary?, score?, raw? }
+ * item brut attendu : { title, url, publishedAt, author?, summary?, imageUrl?, score?, raw? }
  *
  * Un collecteur ne produit JAMAIS de RSS. Il produit des items.
  * Le noyau normalise, déduplique, trie, puis rend (RSS / JSONL / digest).
@@ -118,6 +118,13 @@ function canonicalUrl(raw) {
   } catch { return String(raw || '').trim(); }
 }
 
+function safeMediaUrl(raw) {
+  try {
+    const u = new URL(raw);
+    return /^https?:$/.test(u.protocol) ? u.toString() : null;
+  } catch { return null; }
+}
+
 function normalizeItem(item, collector) {
   if (!item) return null;
   const url = canonicalUrl(item.url ?? item.link);
@@ -138,6 +145,7 @@ function normalizeItem(item, collector) {
     author: item.author ?? item.user ?? null,
     summary: typeof item.summary === 'string' ? item.summary.trim().slice(0, 800)
            : typeof item.text === 'string' ? item.text.trim().slice(0, 800) : null,
+    imageUrl: safeMediaUrl(item.imageUrl ?? item.image ?? item.thumbnail ?? item.thumbnailUrl),
     score: Number.isFinite(item.score) ? item.score : null
   };
 }
@@ -145,12 +153,22 @@ function normalizeItem(item, collector) {
 function dedupe(items) {
   const seen = new Map();
   const dupes = [];
+  const mergeRich = (primary, secondary) => ({
+    ...primary,
+    author: primary.author || secondary.author,
+    summary: primary.summary || secondary.summary,
+    imageUrl: primary.imageUrl || secondary.imageUrl,
+    score: primary.score ?? secondary.score
+  });
   for (const it of items) {
     const prev = seen.get(it.id);
     if (!prev) { seen.set(it.id, it); continue; }
     dupes.push({ id: it.id, kept: prev.collector, dropped: it.collector });
-    // On garde la version la plus ancienne (première publication) et on note la reprise.
-    if (new Date(it.publishedAt) < new Date(prev.publishedAt)) seen.set(it.id, it);
+    // On garde la première publication, tout en récupérant les métadonnées plus riches
+    // (notamment l'image) trouvées par une autre source.
+    seen.set(it.id, new Date(it.publishedAt) < new Date(prev.publishedAt)
+      ? mergeRich(it, prev)
+      : mergeRich(prev, it));
   }
   return { items: [...seen.values()], dupes };
 }
