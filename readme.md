@@ -35,6 +35,8 @@ Ajouter une source = ajouter un `defineCollector()`. Rien d'autre à toucher.
 | `radar-page.mjs` | Page publique statique (balayage 24 h, filtres) |
 | `radar-daily.mjs` | Quotidien régional : une, thèmes, multi-sources, jeux et « La note de Niko » |
 | `radar-v3.mjs` | V3 : événements, chronologies, médias, journalistes et lieux |
+| `radar-services.mjs` | V4 : météo, air, vigilance, crues, trafic, transports, carburants, agenda, emploi et services |
+| `radar-services-view.mjs` | Rendu du bandeau « Aujourd’hui dans le 44 » |
 | `public/` | PWA : manifeste, service worker (lecture hors ligne), icônes, écrans de démarrage iOS |
 | `radar-sources.json` | Flux RSS fixes et hashtags Mastodon |
 
@@ -46,7 +48,7 @@ node radar-run.mjs --query "Châteaubriant" --since 2026-09-01 --out ./dist
 node radar-run.mjs --only reddit,exa
 ```
 
-Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`, `quotidien.html`, `v3/index.html` et `v3/radar-v3.json`.
+Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`, `quotidien.html`, `v3/index.html`, `v3/radar-v3.json` et, lors d’un run connecté, `services.json`.
 
 ## Application (PWA)
 
@@ -65,6 +67,10 @@ La vue `/v3/` regroupe les articles proches en **événements** et montre leur c
 
 Le Quotidien affiche les indicateurs V3, les sujets suivis par plusieurs médias et un lien vers leur chronologie. **« La note de Niko »** ajoute une phrase humoristique déterministe liée au thème dominant du jour ; elle bascule vers une formulation sobre lorsque l'édition est dominée par des faits graves.
 
+#### Quotidien V4 — Aujourd’hui dans le 44
+
+Le bandeau pratique regroupe météo pour Châteaubriant/Nantes/Saint-Nazaire, lever et coucher du soleil, AQI européen, vigilance Météo-France, Vigicrues, accès aux marées officielles SHOM, circulation, perturbations SNCF, carburants, agenda, emploi et services/travaux. Chaque source est isolée : une API indisponible dégrade uniquement sa carte, jamais l’édition entière.
+
 ## Clés et sources
 
 | Source | Variable(s) | Sans clé |
@@ -78,6 +84,13 @@ Le Quotidien affiche les indicateurs V3, les sujets suivis par plusieurs médias
 | YouTube | `YOUTUBE_API_KEY` | ignorée |
 | Exa | `EXA_API_KEY` | ignorée |
 | Twitter / X | `TWITTER_BEARER_TOKEN` (API v2 recent search, offre payante) | ignorée |
+| Vigilance Météo-France | `METEOFRANCE_API_TOKEN` | carte affichée comme non configurée ; le reste de la V4 fonctionne |
+| Météo / soleil / air | aucune | Open-Meteo / CAMS |
+| Vigicrues | aucune | API publique Vigicrues |
+| Trafic Nantes | aucune | Nantes Métropole Open Data |
+| SNCF temps réel | aucune | SIRI Lite via transport.data.gouv.fr |
+| Carburants | aucune | DGCCRF / data.economie.gouv.fr |
+| Marées | aucune | lien vers le portail officiel SHOM |
 
 En local : copier `.env.example` en `.env`, il est chargé automatiquement.
 Une source sans clé est écartée avant le run, pas comptée en échec.
