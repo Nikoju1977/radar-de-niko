@@ -13,7 +13,7 @@ on:
         description: Date plancher ISO (ex. 2026-09-01) — optionnel
         default: ''
   push:
-    branches: [main, improve-pdf-images]
+    branches: [main]
 
 permissions:
   contents: read
