@@ -396,6 +396,32 @@ export async function loadSources() {
 }
 export function setSources(cfg) { sourcesCfg = cfg; }
 
+const JOB_AREA_RX = /(?:^|[^a-z])(chateaubriant|derval|nozay|blain|rouge|moisdon(?:-la-riviere)?|la meilleraye(?:-de-bretagne)?|erbray|isse|soudan|louisfert|noyal(?:-sur-brutz)?|ferce|soulvache|villepot|juigne(?:-des-moutiers)?|saint[- ]julien(?:-de-vouvantes)?|petit[- ]auverne|grand[- ]auverne|la chapelle[- ]glain|jans|marsac[- ]sur[- ]don|lusanger|mouais|sion[- ]les[- ]mines|treffieux|abbaretz|puceul|vay|la grigonnais)(?:[^a-z]|$)/i;
+const foldLocal = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+async function jobs({ since, limit = 160, signal }) {
+  const { jobFeeds: list = [] } = await loadSources();
+  const settled = await Promise.allSettled(list.map(async f => {
+    const xml = await request(f.url, { signal, accept: FEED_ACCEPT, as: 'text', retries: 1 });
+    return recent(parseRSS(xml), since, f.maxAgeDays ?? 45)
+      .filter(i => !f.localOnly || JOB_AREA_RX.test(foldLocal([i.title, i.description, i.source].filter(Boolean).join(' '))))
+      .map(i => ({
+        ...i,
+        source: i.source || f.name,
+        author: i.source || f.name,
+        feed: f.name,
+        employment: true
+      }));
+  }));
+  const failed = settled.map((s, i) => s.status === 'rejected' ? `${list[i].name} (${s.reason?.message ?? s.reason})` : null).filter(Boolean);
+  if (failed.length === list.length && list.length) throw new Error(`tous les flux emploi en échec : ${failed.join(' ; ')}`);
+  const out = settled.flatMap(s => s.status === 'fulfilled' ? s.value : []);
+  out.failedFeeds = failed;
+  return out
+    .sort((a, b) => (Date.parse(b.pubDate) || 0) - (Date.parse(a.pubDate) || 0))
+    .slice(0, limit);
+}
+
 async function feeds({ since, limit = 200, signal }) {
   const { feeds: list = [] } = await loadSources();
   const settled = await Promise.allSettled(list.map(async f => {
@@ -496,11 +522,11 @@ async function mastodon({ query, since, limit = 60, signal }) {
    Façade
    ═══════════════════════════════════════════════════════════ */
 
-const PLATFORMS = { gnews, bing, feeds, bluesky, mastodon, reddit, youtube, exa, twitter };
+const PLATFORMS = { gnews, bing, feeds, jobs, bluesky, mastodon, reddit, youtube, exa, twitter };
 
 /** Clés obligatoires par plateforme (Reddit : aucune, OAuth optionnel). */
 const REQUIRED = {
-  gnews: [], bing: [], feeds: [], bluesky: [], mastodon: [],
+  gnews: [], bing: [], feeds: [], jobs: [], bluesky: [], mastodon: [],
   reddit: [],
   youtube: ['YOUTUBE_API_KEY'],
   exa: ['EXA_API_KEY'],

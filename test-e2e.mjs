@@ -50,6 +50,16 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes('mairie-chateaubriant.fr/feed/?post_type=post')) return reply(RSS([
     { t: 'Actualité municipale à Châteaubriant', u: 'https://www.mairie-chateaubriant.fr/actualites/info', h: 1.5 }]));
   if (u.includes('journal-la-mee.fr') || u.includes('loire-atlantique.gouv.fr/syndication')) return reply(RSS([]));
+  if (u.includes('emploi-territorial.fr/rss?search-col=76013')) return reply(RSS([
+    { t: 'Chargé de mission développement économique', u: 'https://www.emploi-territorial.fr/offre/o044-test1', h: 2,
+      d: 'Communauté de communes Châteaubriant-Derval' }]));
+  if (u.includes('emploi-territorial.fr/rss?search-dept=044')) return reply(RSS([
+    { t: 'Agent technique à Derval', u: 'https://www.emploi-territorial.fr/offre/o044-test2', h: 3, d: 'Poste à Derval' },
+    { t: 'Agent technique à Nantes', u: 'https://www.emploi-territorial.fr/offre/o044-test3', h: 3, d: 'Poste à Nantes' }]));
+  if (u.includes('recrutement.paysdelaloire.fr/handlers/offerRss.ashx')) return reply(RSS([
+    { t: 'Cuisinier (F/H) - Châteaubriant', u: 'https://recrutement.paysdelaloire.fr/offre/emploi-test4', h: 4, d: 'Lycée à Châteaubriant' },
+    { t: 'Cuisinier (F/H) - Clisson', u: 'https://recrutement.paysdelaloire.fr/offre/emploi-test5', h: 4, d: 'Lycée à Clisson' }]));
+
   if (u.includes('france3-regions')) return reply(RSS([
     { t: 'Marché de Châteaubriant déplacé', u: 'https://www.ouest-france.fr/marche?utm_source=f3', h: 1 }]));
   if (u.includes('francebleu') || u.includes('ouest-france.fr/rss') || u.includes('franceinfo.fr')) return reply(RSS([]));
@@ -80,7 +90,7 @@ setReach((platform, opts) => search(platform, opts));
 const run = await runRegistry({ query: 'Loire-Atlantique', since: null });
 const byId = Object.fromEntries(run.reports.map(r => [r.collector.id, r]));
 
-const SRC = ['reach_gnews', 'reach_bing', 'reach_feeds', 'reach_bluesky', 'reach_mastodon',
+const SRC = ['reach_gnews', 'reach_bing', 'reach_feeds', 'reach_jobs', 'reach_bluesky', 'reach_mastodon',
              'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'];
 for (const id of SRC) ok(`${id} répond`, byId[id]?.status === 'ok');
 
@@ -111,6 +121,10 @@ ok('flux mairie Actualités intégré',
    run.items.some(i => i.source === 'presse' && i.author === 'Mairie de Châteaubriant · Actualités'));
 ok('flux mairie Agenda intégré',
    run.items.some(i => i.source === 'presse' && i.author === 'Mairie de Châteaubriant · Agenda'));
+ok('emploi : offres du bassin intégrées',
+   run.items.some(i => i.source === 'emploi' && /Derval|Châteaubriant|développement économique/i.test(i.title)));
+ok('emploi : offre départementale hors bassin filtrée',
+   !run.items.some(i => i.source === 'emploi' && /Nantes|Clisson/i.test(i.title)));
 
 ok('enrichissement 44 appliqué',
    run.items.some(i => i.tags?.includes('44')));
@@ -134,6 +148,8 @@ const facebook = toFacebookText(run);
 ok('quotidien : sélection régionale des dernières 24 h', daily.items.length > 0);
 ok('quotidien : classement thématique présent',
    dailyHtml.includes('Mobilité &amp; travaux') || dailyHtml.includes('Vie locale') || dailyHtml.includes('Culture &amp; sorties'));
+ok('quotidien : offres classées dans Économie & emploi',
+   dailyHtml.includes('Économie &amp; emploi') && daily.items.some(i => i.source === 'emploi'));
 ok('quotidien : cahier jeux complet',
    dailyHtml.includes('Les jeux du jour') && dailyHtml.includes('Sudoku') &&
    dailyHtml.includes('Mots croisés du Pays') && dailyHtml.includes('Mot mêlé régional'));

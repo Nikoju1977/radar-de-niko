@@ -146,6 +146,24 @@ defineCollector({
 });
 
 defineCollector({
+  id: 'reach_jobs', name: 'Emploi · bassin de Châteaubriant', source: 'emploi', version: '1.0',
+  timeout: 40000, retries: 1,
+  collect: async ({ since, signal, log }) => {
+    const raw = await reach('jobs', { since, limit: 160, signal });
+    if (raw.failedFeeds?.length) log?.(`flux emploi en échec : ${raw.failedFeeds.join(' ; ')}`);
+    return raw.map(n => ({
+      title: n.title,
+      url: n.url,
+      author: n.feed || n.author,
+      summary: n.description,
+      imageUrl: n.imageUrl,
+      publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null,
+      tags: ['emploi', '44']
+    }));
+  }
+});
+
+defineCollector({
   id: 'reach_bluesky', name: 'Bluesky', source: 'bluesky', version: '1.0', retries: 2,
   collect: async ({ query, since, signal }) => {
     const raw = await reach('bluesky', { query, since, limit: 50, signal });
@@ -167,7 +185,7 @@ defineCollector({
   }
 });
 
-const SOURCES = ['reach_gnews', 'reach_bing', 'reach_feeds', 'reach_bluesky', 'reach_mastodon', 'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'];
+const SOURCES = ['reach_gnews', 'reach_bing', 'reach_feeds', 'reach_jobs', 'reach_bluesky', 'reach_mastodon', 'reach_twitter', 'reach_reddit', 'reach_youtube', 'reach_exa'];
 
 /* ─── Collecteur dépendant : ne tourne qu'après les sources ──── */
 

@@ -8,7 +8,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const LABEL = {
-  presse: 'Presse', gnews: 'Google News', bing: 'Bing News', bluesky: 'Bluesky',
+  presse: 'Presse', emploi: 'Emploi', gnews: 'Google News', bing: 'Bing News', bluesky: 'Bluesky',
   mastodon: 'Mastodon', reddit: 'Reddit', youtube: 'YouTube', exa: 'Exa', twitter: 'X'
 };
 const label = s => LABEL[s] ?? s;
