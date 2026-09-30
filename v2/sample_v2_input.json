@@ -1,0 +1,58 @@
+{
+  "articles": [
+    {
+      "id": "a1",
+      "source_id": "institution",
+      "source_name": "Ville de Nantes",
+      "title": "La Ville annonce la fermeture du pont X jeudi",
+      "url": "https://nantes.fr/fermeture-pont-x",
+      "canonical_url": "https://nantes.fr/fermeture-pont-x",
+      "author": "Ville de Nantes",
+      "published_at": "2026-09-30T07:00:00+02:00",
+      "excerpt": "Dans un communiqué, la Ville annonce la fermeture du pont X.",
+      "communes": ["Nantes"],
+      "topics": ["mobilite"],
+      "event_id": "evt1"
+    },
+    {
+      "id": "a2",
+      "source_id": "media1",
+      "source_name": "Média 1",
+      "title": "Nantes : le pont X sera fermé jeudi",
+      "url": "https://media1.test/pont-x",
+      "canonical_url": "https://media1.test/pont-x",
+      "author": "Alice Martin",
+      "published_at": "2026-09-30T07:25:00+02:00",
+      "excerpt": "Le pont X sera fermé jeudi à Nantes.",
+      "communes": ["Nantes"],
+      "topics": ["mobilite"],
+      "event_id": "evt1"
+    },
+    {
+      "id": "a3",
+      "source_id": "media2",
+      "source_name": "Média 2",
+      "title": "Fermeture du pont X à Nantes ce jeudi",
+      "url": "https://media2.test/pont-x",
+      "canonical_url": "https://media2.test/pont-x",
+      "author": "Bob Durand",
+      "published_at": "2026-09-30T07:40:00+02:00",
+      "excerpt": "La circulation sera interrompue.",
+      "communes": ["Nantes"],
+      "topics": ["mobilite"],
+      "event_id": "evt1"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt1",
+      "title": "Fermeture du pont X à Nantes",
+      "communes": ["Nantes"],
+      "topics": ["mobilite"],
+      "first_published_at": "2026-09-30T07:00:00+02:00",
+      "last_published_at": "2026-09-30T07:40:00+02:00",
+      "source_count": 3,
+      "article_count": 3
+    }
+  ]
+}
