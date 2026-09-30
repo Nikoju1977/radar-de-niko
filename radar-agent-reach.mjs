@@ -115,6 +115,7 @@ async function redditRSS({ query, since, limit = 50, signal }) {
     created_utc: e.pubDate ? Date.parse(e.pubDate) / 1000 : null,
     author: e.source ? `u/${e.source.replace(/^\/?u\//, '')}` : null,
     selftext: e.description,
+    imageUrl: e.imageUrl,
     score: null
   }));
 }
@@ -157,6 +158,8 @@ async function reddit({ query, since, limit = 50, signal }) {
         created_utc: p.created_utc,
         author: p.author ? `u/${p.author}` : null,
         selftext: p.selftext || null,
+        imageUrl: p.preview?.images?.[0]?.source?.url?.replace(/&amp;/g, '&')
+          ?? (/^https?:\/\//i.test(p.thumbnail ?? '') ? p.thumbnail : null),
         score: p.score
       });
     }
@@ -192,6 +195,10 @@ async function youtube({ query, since, limit = 30, signal }) {
         publishedAt: it.snippet?.publishedAt,
         channelTitle: it.snippet?.channelTitle,
         description: it.snippet?.description,
+        thumbnail: it.snippet?.thumbnails?.high?.url
+          ?? it.snippet?.thumbnails?.medium?.url
+          ?? it.snippet?.thumbnails?.default?.url
+          ?? null,
         viewCount: null                            // exigerait un appel videos.list séparé
       });
     }
@@ -224,6 +231,7 @@ async function exa({ query, since, limit = 40, signal }) {
     author: r.author,
     text: r.text,
     highlights: r.highlights,
+    imageUrl: r.image ?? null,
     score: r.score
   }));
 }
@@ -238,9 +246,10 @@ async function twitter({ query, since, limit = 50, signal }) {
     const u = new URL('https://api.twitter.com/2/tweets/search/recent');
     u.searchParams.set('query', `${query} -is:retweet lang:fr`);
     u.searchParams.set('max_results', String(Math.max(10, Math.min(100, limit - out.length))));
-    u.searchParams.set('tweet.fields', 'created_at,public_metrics,author_id');
-    u.searchParams.set('expansions', 'author_id');
+    u.searchParams.set('tweet.fields', 'created_at,public_metrics,author_id,attachments');
+    u.searchParams.set('expansions', 'author_id,attachments.media_keys');
     u.searchParams.set('user.fields', 'username');
+    u.searchParams.set('media.fields', 'type,url,preview_image_url');
     if (since) u.searchParams.set('start_time', new Date(since).toISOString());
     if (next) u.searchParams.set('next_token', next);
 
@@ -249,14 +258,18 @@ async function twitter({ query, since, limit = 50, signal }) {
     });
 
     const users = new Map((json.includes?.users ?? []).map(x => [x.id, x.username]));
+    const media = new Map((json.includes?.media ?? []).map(x => [x.media_key, x]));
     for (const t of json.data ?? []) {
       const username = users.get(t.author_id) ?? null;
+      const visual = (t.attachments?.media_keys ?? []).map(k => media.get(k))
+        .find(m => m && (m.type === 'photo' || m.preview_image_url || m.url));
       out.push({
         id: t.id,
         username,
         text: t.text,
         url: username ? `https://x.com/${username}/status/${t.id}` : null,
         created_at: t.created_at,
+        imageUrl: visual?.url ?? visual?.preview_image_url ?? null,
         like_count: t.public_metrics?.like_count ?? 0,
         retweet_count: t.public_metrics?.retweet_count ?? 0
       });
@@ -276,6 +289,15 @@ const decode = t => String(t ?? '')
     : ENT[e.toLowerCase()] ?? m);
 const strip = h => decode(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const tag = (xml, name) => xml.match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`, 'i'))?.[1] ?? null;
+const attr = (node, name) => decode(String(node ?? '').match(new RegExp(`\\b${name}=["']([^"']+)`, 'i'))?.[1] ?? '').trim();
+const imageFromXml = block => {
+  const media = String(block).match(/<(?:media:content|media:thumbnail)\\b[^>]*\\burl=["']([^"']+)/i)?.[1];
+  const enclosure = String(block).match(/<enclosure\\b[^>]*>/i)?.[0] ?? '';
+  const enclosed = /\\btype=["']image\//i.test(enclosure) ? attr(enclosure, 'url') : null;
+  const rich = tag(block, 'description') ?? tag(block, 'content') ?? tag(block, 'summary') ?? '';
+  const inline = String(rich).match(/<img\\b[^>]*\\bsrc=["']([^"']+)/i)?.[1];
+  return decode(media ?? enclosed ?? inline ?? '').trim() || null;
+};
 
 export function parseRSS(xml) {
   const src = String(xml);
@@ -287,7 +309,8 @@ export function parseRSS(xml) {
                 ?? e.match(/<link\b[^>]*href=["']([^"']+)/i)?.[1] ?? '') || null,
       pubDate: decode(tag(e, 'published') ?? tag(e, 'updated')).trim() || null,
       source: strip(tag(tag(e, 'author') ?? '', 'name')) || null,
-      description: strip(tag(e, 'content') ?? tag(e, 'summary')).slice(0, 800) || null
+      description: strip(tag(e, 'content') ?? tag(e, 'summary')).slice(0, 800) || null,
+      imageUrl: imageFromXml(e)
     }));
   }
   return [...src.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(([, it]) => {
@@ -299,7 +322,8 @@ export function parseRSS(xml) {
       url: decode(tag(it, 'link')).trim() || null,
       pubDate: decode(tag(it, 'pubDate') ?? tag(it, 'dc:date') ?? tag(it, 'date') ?? tag(it, 'updated')).trim() || null,
       source: source || null,
-      description: strip(tag(it, 'description')) || null
+      description: strip(tag(it, 'description')) || null,
+      imageUrl: imageFromXml(it)
     };
   });
 }
@@ -431,6 +455,11 @@ async function bluesky({ query, since, limit = 50, signal }) {
       url: p.author?.handle && rkey ? `https://bsky.app/profile/${p.author.handle}/post/${rkey}` : null,
       createdAt: p.record?.createdAt ?? p.indexedAt,
       handle: p.author?.handle ?? null,
+      imageUrl: p.embed?.images?.[0]?.fullsize
+        ?? p.embed?.images?.[0]?.thumb
+        ?? p.embed?.media?.images?.[0]?.fullsize
+        ?? p.embed?.media?.images?.[0]?.thumb
+        ?? null,
       likeCount: p.likeCount ?? 0,
       repostCount: p.repostCount ?? 0
     };
@@ -455,6 +484,7 @@ async function mastodon({ query, since, limit = 60, signal }) {
       url: st.url ?? st.uri,
       createdAt: st.created_at,
       acct: st.account?.acct ?? null,
+      imageUrl: st.media_attachments?.[0]?.preview_url ?? st.media_attachments?.[0]?.url ?? null,
       favourites: st.favourites_count ?? 0,
       reblogs: st.reblogs_count ?? 0
     }));
