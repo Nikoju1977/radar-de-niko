@@ -115,21 +115,34 @@ async function collectVigilance(fetchImpl, env) {
   return { status:'ok', color:VIGI_COLOR[Number(dep.max_color_id)] ?? 'Vert', colorId:Number(dep.max_color_id)||1, phenomena, source:'Météo-France' };
 }
 
-function propsText(f) {
-  return Object.values(f?.properties ?? {}).filter(v=>typeof v==='string' || typeof v==='number').join(' ');
-}
+const VIGICRUES_44_CODES = new Set(['ML14','ML15','ML18','BT6']);
 
 async function collectFloods(fetchImpl) {
-  const j=await getJSON('https://www.vigicrues.gouv.fr/services/v1.1/InfoVigiCru.geojson',{},fetchImpl);
-  const rx=/(loire|erdre|sèvre nantaise|sevre nantaise|nantes|saint-nazaire|loire-atlantique)/i;
-  const relevant=(j.features ?? []).filter(f=>rx.test(propsText(f))).slice(0,12);
-  const levels=relevant.map(f=>{
-    const p=f.properties ?? {};
-    const raw=Number(p.NivVigi ?? p.niv_vigi ?? p.CdCouleur ?? p.couleur ?? p.color_id ?? 1);
-    return Number.isFinite(raw)?raw:1;
-  });
-  const max=levels.length?Math.max(...levels):1;
-  return { level:max, color:VIGI_COLOR[max] ?? 'Vert', count:relevant.length, names:relevant.map(f=>f.properties?.NomEntVigiCru ?? f.properties?.LbEntVigiCru ?? f.properties?.name).filter(Boolean).slice(0,5), source:'Vigicrues' };
+  // La documentation Vigicrues v1.1 référence InfoVigiCru via /services/1/.
+  // Le serveur redirige actuellement vers /services/InfoVigiCru.geojson.
+  const j=await getJSON('https://www.vigicrues.gouv.fr/services/1/InfoVigiCru.geojson',{},fetchImpl);
+  const relevant=(j.features ?? [])
+    .filter(f=>VIGICRUES_44_CODES.has(String(f?.properties?.CdEntCru ?? '')))
+    .map(f=>{
+      const p=f.properties ?? {};
+      const level=Number(p.NivInfViCr ?? 1);
+      return {
+        code:String(p.CdEntCru ?? ''),
+        name:p.lbentcru ?? p.LbEntVigiCru ?? p.name ?? 'Tronçon',
+        level:Number.isFinite(level)?level:1,
+        color:VIGI_COLOR[Number.isFinite(level)?level:1] ?? 'Vert'
+      };
+    });
+  const max=relevant.length ? Math.max(...relevant.map(x=>x.level)) : 1;
+  return {
+    level:max,
+    color:VIGI_COLOR[max] ?? 'Vert',
+    count:relevant.length,
+    names:relevant.map(x=>x.name),
+    sections:relevant,
+    source:'Vigicrues',
+    url:'https://www.vigicrues.gouv.fr/'
+  };
 }
 
 const XML_TEXT = s => String(s??'').replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g,' ').trim();
