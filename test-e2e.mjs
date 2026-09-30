@@ -164,6 +164,16 @@ ok('quotidien : export PDF A4 optimisé', dailyHtml.includes('@page{size:A4') &&
 ok('v3 : graphe événementiel construit', graph.stats.events > 0 && Object.keys(graph.articleToEvent).length > 0);
 ok('v3 : signature journaliste détectée', graph.journalists.some(j => j.name === 'Alice Reporter'));
 ok('v3 : page événements générée', v3Html.includes('Radar44 V3') && v3Html.includes('Journalistes') && v3Html.includes('timeline'));
+const multiGraph = buildRadarV3({ items: [
+  { id:'mx1', title:'Nantes : le pont Bellevue fermé après un incident', url:'https://a.test/1', publishedAt:iso(1), source:'presse', media:'Média A', author:'Alice Martin', tags:['44'] },
+  { id:'mx2', title:'Incident à Nantes : le pont Bellevue est fermé', url:'https://b.test/2', publishedAt:iso(.8), source:'presse', media:'Média B', author:'Bob Durand', tags:['44'] }
+]});
+ok('v3 : deux médias proches regroupés en un sujet multi-sources',
+   multiGraph.events.length === 1 && multiGraph.events[0].sourceCount === 2 && multiGraph.events[0].multiSource);
+const seriousNote = nikoNote({ items:[
+  { title:'Accident mortel à Nantes', summary:'Une personne est décédée.', source:'presse' }
+], groups:new Map(), now:Date.now() });
+ok('quotidien : humour neutralisé sur un fait grave', /sobriété/i.test(seriousNote));
 ok('quotidien : contexte V3 affiché', dailyHtml.includes('Événements V3') && dailyHtml.includes('edition-stats'));
 ok('quotidien : La note de Niko présente', dailyHtml.includes('La note de Niko') && nikoNote(daily).length > 20);
 ok('facebook : La note de Niko présente', facebook.includes('LA NOTE DE NIKO'));
