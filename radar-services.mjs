@@ -47,15 +47,39 @@ function dailyAt(data, key) {
   return Array.isArray(data?.daily?.[key]) ? data.daily[key][0] : null;
 }
 
-async function weatherFor(place, fetchImpl) {
-  const u = new URL('https://api.open-meteo.com/v1/forecast');
+const METNO_SYMBOLS = {
+  clearsky_day:'Ciel clair', clearsky_night:'Ciel clair',
+  fair_day:'Plutôt clair', fair_night:'Plutôt clair',
+  partlycloudy_day:'Éclaircies', partlycloudy_night:'Éclaircies',
+  cloudy:'Couvert', fog:'Brouillard',
+  lightrain:'Pluie faible', rain:'Pluie', heavyrain:'Pluie forte',
+  lightrainshowers_day:'Averses faibles', lightrainshowers_night:'Averses faibles',
+  rainshowers_day:'Averses', rainshowers_night:'Averses',
+  heavyrainshowers_day:'Fortes averses', heavyrainshowers_night:'Fortes averses',
+  lightsnow:'Neige faible', snow:'Neige', heavysnow:'Neige forte',
+  sleet:'Pluie et neige', thunderstorm:'Orages'
+};
+
+function metNoCondition(code='') {
+  const k=String(code).replace(/_polartwilight$/,'_day');
+  if (METNO_SYMBOLS[k]) return METNO_SYMBOLS[k];
+  if (/thunder/.test(k)) return 'Orages';
+  if (/snow/.test(k)) return 'Neige';
+  if (/rain|sleet/.test(k)) return /heavy/.test(k) ? 'Pluie forte' : 'Pluie';
+  return 'Variable';
+}
+
+async function openMeteoFranceFor(place, fetchImpl) {
+  const u = new URL('https://api.open-meteo.com/v1/meteofrance');
   u.searchParams.set('latitude', place.lat);
   u.searchParams.set('longitude', place.lon);
   u.searchParams.set('timezone', 'Europe/Paris');
+  u.searchParams.set('models', 'meteofrance_seamless');
   u.searchParams.set('forecast_days', '1');
   u.searchParams.set('current', 'temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,precipitation');
   u.searchParams.set('daily', 'temperature_2m_min,temperature_2m_max,precipitation_probability_max,weather_code,wind_gusts_10m_max,sunrise,sunset');
   const j = await getJSON(u, {}, fetchImpl);
+  if (!Number.isFinite(Number(j.current?.temperature_2m))) throw new Error('Météo-France model data missing');
   return {
     name: place.name,
     temperature: j.current?.temperature_2m ?? null,
@@ -66,12 +90,69 @@ async function weatherFor(place, fetchImpl) {
     max: dailyAt(j,'temperature_2m_max'),
     rainRisk: dailyAt(j,'precipitation_probability_max'),
     sunrise: dailyAt(j,'sunrise'),
-    sunset: dailyAt(j,'sunset')
+    sunset: dailyAt(j,'sunset'),
+    provider:'Open-Meteo / Météo-France AROME + ARPEGE'
   };
 }
 
+async function metNorwayFor(place, fetchImpl) {
+  const u = new URL('https://api.met.no/weatherapi/locationforecast/2.0/compact');
+  u.searchParams.set('lat', Number(place.lat).toFixed(4));
+  u.searchParams.set('lon', Number(place.lon).toFixed(4));
+  const j = await getJSON(u, {
+    headers:{
+      'User-Agent':'Radar44/5.0 (+https://nikoju1977.github.io/radar-de-niko/)',
+      accept:'application/json'
+    }
+  }, fetchImpl);
+  const rows=j?.properties?.timeseries ?? [];
+  if (!rows.length) throw new Error('MET Norway forecast empty');
+  const first=rows[0];
+  const details=first?.data?.instant?.details ?? {};
+  const symbol=first?.data?.next_1_hours?.summary?.symbol_code
+    ?? first?.data?.next_6_hours?.summary?.symbol_code
+    ?? '';
+  const dayFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
+  const today=dayFmt.format(new Date());
+  const dayRows=rows.filter(r=>dayFmt.format(new Date(r.time))===today);
+  const temps=dayRows.map(r=>Number(r?.data?.instant?.details?.air_temperature)).filter(Number.isFinite);
+  const windMs=Number(details.wind_speed);
+  const gustMs=Number(details.wind_speed_of_gust);
+  return {
+    name:place.name,
+    temperature:Number.isFinite(Number(details.air_temperature))?Number(details.air_temperature):null,
+    condition:metNoCondition(symbol),
+    wind:Number.isFinite(windMs)?windMs*3.6:null,
+    gust:Number.isFinite(gustMs)?gustMs*3.6:(Number.isFinite(windMs)?windMs*3.6:null),
+    min:temps.length?Math.min(...temps):null,
+    max:temps.length?Math.max(...temps):null,
+    rainRisk:null,
+    sunrise:null,
+    sunset:null,
+    provider:'MET Norway Locationforecast 2.0'
+  };
+}
+
+async function weatherFor(place, fetchImpl) {
+  try { return await openMeteoFranceFor(place, fetchImpl); }
+  catch (primaryError) {
+    const fallback=await metNorwayFor(place, fetchImpl);
+    fallback.fallback=true;
+    fallback.primaryError=String(primaryError?.message || primaryError);
+    return fallback;
+  }
+}
+
 async function collectWeather(fetchImpl) {
-  return { locations: await Promise.all(PLACES.map(p => weatherFor(p, fetchImpl))), source:'Open-Meteo / modèles Météo-France & ECMWF' };
+  const locations=await Promise.all(PLACES.map(p => weatherFor(p, fetchImpl)));
+  const fallbackCount=locations.filter(x=>x.fallback).length;
+  return {
+    locations,
+    source:fallbackCount
+      ? 'Open-Meteo / Météo-France AROME + ARPEGE, secours MET Norway'
+      : 'Open-Meteo / Météo-France AROME + ARPEGE',
+    fallbackCount
+  };
 }
 
 function aqiLabel(v) {
