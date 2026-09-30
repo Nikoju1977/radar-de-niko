@@ -10,7 +10,8 @@ import { search } from './radar-agent-reach.mjs';
 import { setReach } from './radar-collectors.mjs';
 import { runRegistry, toRSS } from './radar-registry.mjs';
 import { toHTML } from './radar-page.mjs';
-import { toDailyHTML, toFacebookText, buildDaily } from './radar-daily.mjs';
+import { toDailyHTML, toFacebookText, buildDaily, nikoNote } from './radar-daily.mjs';
+import { buildRadarV3, toV3HTML } from './radar-v3.mjs';
 
 let failed = 0;
 const ok = (n, c) => { if (!c) failed++; console.log((c ? '✓' : '✗ ÉCHEC') + ' ' + n); };
@@ -27,7 +28,7 @@ process.env.TWITTER_BEARER_TOKEN = 'k';
 const iso = h => new Date(Date.now() - h * 36e5).toISOString();
 
 const RSS = (items) => `<?xml version="1.0"?><rss><channel>${items.map(i =>
-  `<item><title>${i.t}</title><link>${i.u}</link><pubDate>${new Date(Date.now() - i.h * 36e5).toUTCString()}</pubDate>${i.s ? `<source url="x">${i.s}</source>` : ''}${i.img ? `<media:content url="${i.img}" medium="image"/>` : ''}<description>${i.d ?? ''}</description></item>`).join('')}</channel></rss>`;
+  `<item><title>${i.t}</title><link>${i.u}</link><pubDate>${new Date(Date.now() - i.h * 36e5).toUTCString()}</pubDate>${i.s ? `<source url="x">${i.s}</source>` : ''}${i.a ? `<dc:creator>${i.a}</dc:creator>` : ''}${i.img ? `<media:content url="${i.img}" medium="image"/>` : ''}<description>${i.d ?? ''}</description></item>`).join('')}</channel></rss>`;
 const ATOM = (items) => `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">${items.map(i =>
   `<entry><title>${i.t}</title><link href="${i.u}"/><updated>${iso(i.h)}</updated><author><name>/u/${i.a}</name></author><content type="html">${i.d ?? ''}</content></entry>`).join('')}</feed>`;
 
@@ -43,7 +44,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes('bing.com/news')) return reply(RSS([
     { t: 'Blain : le château rouvre', u: 'http://www.bing.com/news/apiclick.aspx?url=https%3a%2f%2factu.fr%2fblain-chateau&c=1', h: 2 }]));
   if (u.includes('actu.fr/l-eclaireur')) return reply(RSS([
-    { t: 'Derval : nouvelle boulangerie', u: 'https://actu.fr/derval-boulangerie', h: 3 }]));
+    { t: 'Derval : nouvelle boulangerie', u: 'https://actu.fr/derval-boulangerie', h: 3, a: 'Alice Reporter' }]));
   if (u.includes('mairie-chateaubriant.fr/feed/?post_type=agenda')) return reply(RSS([
     { t: 'Atelier informatique à Châteaubriant', u: 'https://www.mairie-chateaubriant.fr/agenda/atelier-informatique',
       h: 2, d: 'Accessibilité, Commu' + String.fromCharCode(2) + 'nication' }]));
@@ -116,7 +117,8 @@ ok('Bing : lien réel extrait de la redirection', run.items.some(i => i.url === 
 ok('Mastodon : HTML retiré du texte', run.items.some(i => i.source === 'mastodon' && !/[<>]/.test(i.title)));
 ok('Bluesky : URL de post reconstruite', run.items.some(i => i.url === 'https://bsky.app/profile/nantes.bsky.social/post/3kabc'));
 ok('Reddit sans clé : lu via Atom', run.items.some(i => i.source === 'reddit' && i.title.includes('RN171')));
-ok('flux presse : nom du journal conservé', run.items.some(i => i.source === 'presse' && i.author === "L'Éclaireur de Châteaubriant"));
+ok('flux presse : média et signature séparés',
+   run.items.some(i => i.source === 'presse' && i.media === "L'Éclaireur de Châteaubriant" && i.author === 'Alice Reporter'));
 ok('flux mairie Actualités intégré',
    run.items.some(i => i.source === 'presse' && i.author === 'Mairie de Châteaubriant · Actualités'));
 ok('flux mairie Agenda intégré',
@@ -142,9 +144,11 @@ ok('flux RSS contient tous les items',
 ok('RSS nettoie les caractères de contrôle interdits',
    !xml.includes(String.fromCharCode(2)));
 
-const daily = buildDaily(run);
-const dailyHtml = toDailyHTML(run);
-const facebook = toFacebookText(run);
+const graph = buildRadarV3(run);
+const v3Html = toV3HTML(graph);
+const daily = buildDaily(run, Date.now(), graph);
+const dailyHtml = toDailyHTML(run, { v3Graph: graph });
+const facebook = toFacebookText(run, { v3Graph: graph });
 ok('quotidien : sélection régionale des dernières 24 h', daily.items.length > 0);
 ok('quotidien : classement thématique présent',
    dailyHtml.includes('Mobilité &amp; travaux') || dailyHtml.includes('Vie locale') || dailyHtml.includes('Culture &amp; sorties'));
@@ -157,6 +161,12 @@ ok('quotidien : partage Facebook prêt',
    facebook.includes('LE QUOTIDIEN DU RADAR 44') && facebook.includes('quotidien.html'));
 ok('quotidien : images intégrées au rendu', dailyHtml.includes('story-photo') || dailyHtml.includes('lead-photo'));
 ok('quotidien : export PDF A4 optimisé', dailyHtml.includes('@page{size:A4') && dailyHtml.includes('id="pdf"') && dailyHtml.includes('exportPdf'));
+ok('v3 : graphe événementiel construit', graph.stats.events > 0 && Object.keys(graph.articleToEvent).length > 0);
+ok('v3 : signature journaliste détectée', graph.journalists.some(j => j.name === 'Alice Reporter'));
+ok('v3 : page événements générée', v3Html.includes('Radar44 V3') && v3Html.includes('Journalistes') && v3Html.includes('timeline'));
+ok('quotidien : contexte V3 affiché', dailyHtml.includes('Événements V3') && dailyHtml.includes('edition-stats'));
+ok('quotidien : La note de Niko présente', dailyHtml.includes('La note de Niko') && nikoNote(daily).length > 20);
+ok('facebook : La note de Niko présente', facebook.includes('LA NOTE DE NIKO'));
 
 run.items[0].title = '<script>alert(1)</script> & co';
 const html = toHTML(run);
@@ -169,6 +179,7 @@ ok('page : seul le déclenchement manuel utilise fetch côté navigateur',
    !/XMLHttpRequest/.test(html));
 ok('page : un seul identifiant par item', new Set(html.match(/<li id="[^"]+"/g)).size === run.items.length);
 ok('page : accès au quotidien régional', html.includes('href="quotidien.html"'));
+ok('page : accès à Radar44 V3', html.includes('href="v3/"'));
 
 ok('pwa : manifeste, service worker et icône iOS référencés',
    html.includes('rel="manifest"') && html.includes("register('sw.js')") && html.includes('apple-touch-icon'));
