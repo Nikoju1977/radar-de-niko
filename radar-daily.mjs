@@ -40,7 +40,7 @@ export function isRegionalItem(item, now = Date.now()) {
   const text = [item.title, item.summary].filter(Boolean).join(' ');
   return item.source === 'emploi'
     || item.tags?.includes('44')
-    || LOCAL_SOURCE.test(item.author ?? '')
+    || LOCAL_SOURCE.test([item.author, item.media].filter(Boolean).join(' '))
     || LOCAL_URL.test(item.url ?? '')
     || hasRegionalPlace(text);
 }
@@ -57,7 +57,7 @@ function leadScore(item, now) {
   const ageHours = Math.max(0, (now - Date.parse(item.publishedAt)) / 36e5);
   let score = Math.max(0, 48 - ageHours);
   if (item.source === 'presse' || item.source === 'gnews') score += 80;
-  if (LOCAL_SOURCE.test(item.author ?? '') || LOCAL_URL.test(item.url ?? '')) score += 70;
+  if (LOCAL_SOURCE.test([item.author, item.media].filter(Boolean).join(' ')) || LOCAL_URL.test(item.url ?? '')) score += 70;
   if (item.tags?.includes('44')) score += 35;
   if (/^(mastodon|bluesky|reddit|twitter)$/i.test(item.source ?? '')) score -= 45;
   if (String(item.title ?? '').length >= 45) score += 8;
