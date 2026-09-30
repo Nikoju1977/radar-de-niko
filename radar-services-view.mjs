@@ -21,6 +21,11 @@ export function servicesPanel(s) {
   const vigilance = s.vigilance?.status === 'ok' ? '<div class="service-card vigilance v'+esc(s.vigilance.colorId)+'"><span class="service-kicker">Vigilance Météo-France</span><b>'+esc(s.vigilance.color)+'</b><small>'+esc((s.vigilance.phenomena??[]).map(x=>x.name+' '+x.color).join(' · ')||'Aucun phénomène au-dessus du vert')+'</small></div>' : '<div class="service-card muted"><span class="service-kicker">Vigilance</span><b>'+(s.vigilance?.status==='unconfigured'?'Clé Météo-France à connecter':'Indisponible')+'</b></div>';
   const floods = s.floods?.status === 'ok' ? '<div class="service-card"><span class="service-kicker">Vigicrues</span><b>'+esc(s.floods.color??'Vert')+'</b><small>'+esc((s.floods.names??[]).join(' · ')||'Aucun tronçon local signalé')+'</small></div>' : '<div class="service-card muted"><span class="service-kicker">Vigicrues</span><b>Indisponible</b></div>';
   const fuel = s.fuel?.status === 'ok' ? '<div class="service-card fuel"><span class="service-kicker">Carburants 44</span><b>'+esc(s.fuel.stations)+' stations lues</b><small>'+esc((s.fuel.fuels??[]).slice(0,4).map(x=>x.name+' min. '+x.min.toFixed(3).replace('.',',')+' €').join(' · ')||'Prix non remontés')+'</small></div>' : '<div class="service-card muted"><span class="service-kicker">Carburants</span><b>Indisponible</b></div>';
+  const tide = s.tides?.status === 'ok'
+    ? '<a class="service-card tide" href="'+esc(s.tides.officialUrl||'https://maree.shom.fr/')+'" target="_blank" rel="noopener"><span class="service-kicker">Marées · estimation</span><b>'+
+      esc((s.tides.ports??[]).map(p=>p.name+' · '+((p.extrema??[]).slice(0,2).map(e=>e.type+' '+clock(e.time)).join(' · ')||'—')).join(' / '))+
+      '</b><small>Indicatif uniquement · horaires officiels SHOM →</small></a>'
+    : '<a class="service-card tide" href="https://maree.shom.fr/" target="_blank" rel="noopener"><span class="service-kicker">Marées · SHOM</span><b>Saint-Nazaire · Pornic · Le Croisic</b><small>Consulter les horaires officiels →</small></a>';
   const trafficCount=(s.traffic?.items??[]).length;
   const transportCount=(s.transport?.radar??[]).length+(s.transport?.alerts??[]).length;
   const practical = '<div class="service-list"><h3>Circulation & transports</h3><p><b>'+trafficCount+'</b> signalement'+(trafficCount>1?'s':'')+' routier'+(trafficCount>1?'s':'')+' · <b>'+transportCount+'</b> info'+(transportCount>1?'s':'')+' transport</p><ul>'+links(s.traffic?.items,2)+links(s.transport?.radar,2)+'</ul></div>'+
@@ -28,8 +33,7 @@ export function servicesPanel(s) {
     '<div class="service-list"><h3>Emploi</h3><p><b>'+(s.jobs?.items?.length??0)+'</b> offres récentes</p><ul>'+links(s.jobs?.items,3)+'</ul></div>'+
     '<div class="service-list"><h3>Services & travaux</h3><p><b>'+(s.services?.items?.length??0)+'</b> informations pratiques</p><ul>'+links(s.services?.items,3)+'</ul></div>';
   return '<section class="today" id="aujourdhui"><div class="today-head"><div><span>Pratique · temps réel</span><h2>Aujourd’hui dans le 44</h2></div><p>Météo, mobilité, environnement et vie quotidienne.</p></div>'+
-    '<div class="weather-grid">'+weather+'</div><div class="service-grid">'+vigilance+floods+air+sun+fuel+
-    '<a class="service-card tide" href="'+esc(s.tides?.url||'https://maree.shom.fr/')+'" target="_blank" rel="noopener"><span class="service-kicker">Marées · SHOM</span><b>Saint-Nazaire · Pornic · Le Croisic</b><small>Consulter les horaires officiels →</small></a></div>'+
+    '<div class="weather-grid">'+weather+'</div><div class="service-grid">'+vigilance+floods+air+sun+fuel+tide+'</div>'+
     '<div class="practical-grid">'+practical+'</div></section>';
 }
 
