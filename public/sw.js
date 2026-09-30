@@ -31,6 +31,11 @@ self.addEventListener('fetch', e => {
     return;
   }
   const isPage = req.mode === 'navigate';
+  const navKey = isPage
+    ? (/\/v3\/?(?:index\.html)?$/.test(url.pathname) ? 'v3/index.html'
+      : /\/quotidien\.html$/.test(url.pathname) ? 'quotidien.html'
+      : './')
+    : req;
   // Une requête de navigation ne peut pas être recopiée avec des options
   // (TypeError sur Chrome et Safari) : on en reconstruit une à partir de l'URL.
   const net = isPage
@@ -40,11 +45,10 @@ self.addEventListener('fetch', e => {
     net.then(res => {
       if (res.ok) {
         const copy = res.clone();
-        // Une seule entrée pour la page, quels que soient les paramètres (?f=new, ?source=pwa)
-        caches.open(CACHE).then(c => c.put(isPage ? './' : req, copy));
+        caches.open(CACHE).then(c => c.put(navKey, copy));
       }
       return res;
-    }).catch(() => caches.match(isPage ? './' : req, { ignoreSearch: true })
+    }).catch(() => caches.match(navKey, { ignoreSearch: true })
       .then(hit => hit || (isPage ? caches.match('index.html') : Response.error())))
   );
 });
