@@ -8,13 +8,13 @@ const links = (items,max=3) => (items ?? []).slice(0,max).map(i => '<li><a href=
 export function servicesFacebookLine(s) {
   if (s?.weather?.status !== 'ok' || !s.weather.locations?.length) return null;
   const w=s.weather.locations[0];
-  return 'MÉTÉO — '+w.name+' : '+Math.round(w.min)+'° → '+Math.round(w.max)+'° · '+w.condition+(Number.isFinite(Number(w.rainRisk))?' · pluie '+Math.round(w.rainRisk)+'%':'');
+  return 'MÉTÉO — '+w.name+' : '+Math.round(w.min)+'° → '+Math.round(w.max)+'° · '+w.condition+(Number.isFinite(Number(w.rainMm))?' · pluie '+n(w.rainMm,1)+' mm':(Number.isFinite(Number(w.rainRisk))?' · pluie '+Math.round(w.rainRisk)+'%':''));
 }
 
 export function servicesPanel(s) {
   if (!s) return '<section class="today"><div class="today-head"><div><span>Services du jour</span><h2>Aujourd’hui dans le 44</h2></div><p>Données pratiques au prochain run connecté.</p></div></section>';
   const weather = s.weather?.status === 'ok' ? (s.weather.locations ?? []).map(w =>
-    '<div class="weather-place"><b>'+esc(w.name)+'</b><strong>'+n(w.min)+'° → '+n(w.max)+'°</strong><span>'+esc(w.condition)+(Number.isFinite(Number(w.rainRisk))?' · pluie '+Math.round(w.rainRisk)+'%':'')+'</span><small>Vent '+n(w.wind)+' km/h · raf. '+n(w.gust)+'</small><em>'+esc(w.provider||s.weather.source||'')+(w.fallback?' · secours':'')+'</em></div>'
+    '<div class="weather-place"><b>'+esc(w.name)+'</b><strong>'+n(w.min)+'° → '+n(w.max)+'°</strong><span>'+esc(w.condition)+(Number.isFinite(Number(w.rainMm))?' · pluie '+n(w.rainMm,1)+' mm':(Number.isFinite(Number(w.rainRisk))?' · pluie '+Math.round(w.rainRisk)+'%':''))+'</span><small>Vent '+n(w.wind)+' km/h · raf. '+n(w.gust)+'</small><em>'+esc(w.provider||s.weather.source||'')+(w.fallback?' · secours':'')+'</em></div>'
   ).join('') : '<p class="service-off">Météo temporairement indisponible.</p>';
   const sun = s.weather?.status === 'ok' && s.weather.locations?.[0] ? '<div class="service-card"><span class="service-kicker">Soleil</span><b>↑ '+clock(s.weather.locations[0].sunrise)+' · ↓ '+clock(s.weather.locations[0].sunset)+'</b><small>'+esc(s.weather.locations[0].name)+'</small></div>' : '';
   const air = s.air?.status === 'ok' ? '<div class="service-card"><span class="service-kicker">Qualité de l’air</span><b>'+esc(s.air.label)+(s.air.aqi!=null?' · '+esc(s.air.aqi):'')+'</b><small>AQI européen · '+esc(s.air.place)+'</small></div>' : '<div class="service-card muted"><span class="service-kicker">Air</span><b>Indisponible</b></div>';
