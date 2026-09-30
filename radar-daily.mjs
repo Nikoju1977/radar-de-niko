@@ -146,10 +146,21 @@ export function toFacebookText(run, {
   ];
   if (d.lead) lines.push('À LA UNE — ' + d.lead.title, '');
   lines.push('LA NOTE DE NIKO — ' + nikoNote(d), '');
+  const seenEvents = new Set();
   for (const [theme, items] of d.groups) {
-    if (!items.length) continue;
-    lines.push('▸ ' + theme + ' (' + items.length + ')');
-    for (const i of items.slice(0, 2)) lines.push('• ' + i.title);
+    const unique = [];
+    for (const i of items) {
+      const eid = d.graph.articleToEvent[i.id] ?? i.id;
+      if (seenEvents.has(eid)) continue;
+      seenEvents.add(eid);
+      const event = d.graph.events.find(e => e.id === eid);
+      unique.push({ item:i, event });
+    }
+    if (!unique.length) continue;
+    lines.push('▸ ' + theme + ' (' + unique.length + ')');
+    for (const { item, event } of unique.slice(0, 2)) {
+      lines.push('• ' + item.title + (event?.multiSource ? ' [' + event.sourceCount + ' sources]' : ''));
+    }
     lines.push('');
   }
   lines.push('📖 Lire le journal complet : ' + url);
@@ -186,23 +197,36 @@ export function toDailyHTML(run, {
   const note = nikoNote(d);
   const eventById = new Map(d.graph.events.map(e => [e.id, e]));
   const eventFor = i => eventById.get(d.graph.articleToEvent[i.id]);
-  const renderedEvents = new Set();
   const leadEvent = lead ? eventFor(lead) : null;
-  if (leadEvent) renderedEvents.add(leadEvent.id);
+  const renderedEvents = new Set(leadEvent ? [leadEvent.id] : []);
   let photoBudget = 8;
-  const sections = [...d.groups.entries()].filter(([, items]) => items.some(i => i.id !== lead?.id)).map(([theme, items]) => {
-    const body=items.map(i => {
+  const sectionData = [...d.groups.entries()].map(([theme, items]) => {
+    const localSeen = new Set();
+    const unique = [];
+    for (const i of items) {
       const event = eventFor(i);
-      if (event && renderedEvents.has(event.id)) return '';
-      if (event) renderedEvents.add(event.id);
-      const usePhoto = i.id !== lead?.id && Boolean(i.imageUrl) && photoBudget > 0;
+      const key = event?.id ?? i.id;
+      if (localSeen.has(key)) continue;
+      localSeen.add(key);
+      unique.push({ item:i, event, key });
+    }
+    return [theme, unique];
+  });
+  const sections = sectionData.map(([theme, entries]) => {
+    const visible = entries.filter(({ item, key }) => item.id !== lead?.id && !renderedEvents.has(key));
+    if (!visible.length) return '';
+    const body = visible.map(({ item:i, event, key }) => {
+      renderedEvents.add(key);
+      const usePhoto = Boolean(i.imageUrl) && photoBudget > 0;
       if (usePhoto) photoBudget--;
       return articleRow(i, lead?.id, usePhoto, event);
     }).join('');
-    return `<section class="theme" id="${slug(theme)}"><h2>${esc(theme)} <span>${items.length}</span></h2><div class="columns">${body}</div></section>`;
+    return `<section class="theme" id="${slug(theme)}"><h2>${esc(theme)} <span>${visible.length}</span></h2><div class="columns">${body}</div></section>`;
   }).join('');
-  const toc=[...d.groups.entries()].filter(([,items])=>items.length).map(([theme,items])=>
-    `<a href="#${slug(theme)}">${esc(theme)} <b>${items.length}</b></a>`).join('');
+  const toc = sectionData.map(([theme, entries]) => {
+    const count = entries.filter(({ item, key }) => item.id !== lead?.id && key !== leadEvent?.id).length;
+    return count ? `<a href="#${slug(theme)}">${esc(theme)} <b>${count}</b></a>` : '';
+  }).join('');
   const dayKey=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(d.now));
   const shareJson=JSON.stringify(toFacebookText(run, { v3Graph: d.graph })).replace(/<\//g,'<\\/');
 
