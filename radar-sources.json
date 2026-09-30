@@ -1,5 +1,5 @@
 {
-  "_doc": "Flux fixes RSS/Atom gratuits, sans clé. Priorité aux sources hyperlocales et officielles ; filtrage par fraîcheur via maxAgeDays. Vérifiés le 2026-09-27.",
+  "_doc": "Flux fixes RSS/Atom gratuits, sans clé. Priorité aux sources hyperlocales et officielles ; filtrage par fraîcheur via maxAgeDays. Flux emploi ajoutés et vérifiés le 2026-09-30.",
   "feeds": [
     {
       "name": "L'Éclaireur de Châteaubriant",
@@ -76,5 +76,25 @@
     "Nozay Loire-Atlantique",
     "Derval Loire-Atlantique",
     "Rougé Loire-Atlantique"
+  ],
+  "jobFeeds": [
+    {
+      "name": "Emploi Territorial · Châteaubriant-Derval",
+      "url": "https://www.emploi-territorial.fr/rss?search-col=76013",
+      "maxAgeDays": 45,
+      "localOnly": false
+    },
+    {
+      "name": "Emploi Territorial · Loire-Atlantique",
+      "url": "https://www.emploi-territorial.fr/rss?search-dept=044",
+      "maxAgeDays": 45,
+      "localOnly": true
+    },
+    {
+      "name": "Région Pays de la Loire · Emploi 44",
+      "url": "https://recrutement.paysdelaloire.fr/handlers/offerRss.ashx?Rss_Location_CustomCodeTableValue1=3153&lcid=1036",
+      "maxAgeDays": 45,
+      "localOnly": true
+    }
   ]
 }
