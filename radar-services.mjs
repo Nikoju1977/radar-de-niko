@@ -163,6 +163,44 @@ const num = v => {
   return Number.isFinite(n) && n>0 && n<5 ? n : null;
 };
 
+
+const TIDE_PORTS = [
+  {name:'Saint-Nazaire',lat:47.258,lon:-2.200},
+  {name:'Pornic',lat:47.105,lon:-2.092},
+  {name:'Le Croisic',lat:47.294,lon:-2.513}
+];
+
+function tideExtrema(times, values) {
+  const out=[];
+  for(let i=1;i<values.length-1;i++){
+    const a=Number(values[i-1]), b=Number(values[i]), c=Number(values[i+1]);
+    if(![a,b,c].every(Number.isFinite)) continue;
+    if(b>a && b>c) out.push({type:'PM',time:times[i],height:b});
+    if(b<a && b<c) out.push({type:'BM',time:times[i],height:b});
+  }
+  return out.slice(0,5);
+}
+
+async function collectTides(fetchImpl) {
+  const ports=[];
+  for(const port of TIDE_PORTS){
+    const u=new URL('https://marine-api.open-meteo.com/v1/marine');
+    u.searchParams.set('latitude',port.lat);
+    u.searchParams.set('longitude',port.lon);
+    u.searchParams.set('hourly','sea_level_height_msl');
+    u.searchParams.set('timezone','Europe/Paris');
+    u.searchParams.set('forecast_days','1');
+    const j=await getJSON(u,{},fetchImpl);
+    ports.push({name:port.name,extrema:tideExtrema(j.hourly?.time??[],j.hourly?.sea_level_height_msl??[])});
+  }
+  return {
+    ports,
+    officialUrl:'https://maree.shom.fr/',
+    source:'Open-Meteo marine (estimation) + SHOM (référence officielle)',
+    disclaimer:'Estimation indicative du niveau marin, non adaptée à la navigation. Vérifier les horaires officiels du SHOM.'
+  };
+}
+
 async function collectFuel(fetchImpl) {
   const u=new URL('https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records');
   u.searchParams.set('where','code_departement="44"');
@@ -193,20 +231,20 @@ function collectLocal(run, now) {
 }
 
 export async function collectDailyServices(run, { now=Date.now(), fetchImpl=fetch, env=process.env }={}) {
-  const [weather,air,vigilance,floods,transport,traffic,fuel]=await Promise.all([
+  const [weather,air,vigilance,floods,transport,traffic,fuel,tides]=await Promise.all([
     safe('weather',()=>collectWeather(fetchImpl)),
     safe('air',()=>collectAir(fetchImpl)),
     collectVigilance(fetchImpl,env).catch(e=>({status:'error',name:'vigilance',error:String(e.message||e)})),
     safe('floods',()=>collectFloods(fetchImpl)),
     safe('transport',()=>collectTransport(fetchImpl,run)),
     safe('traffic',()=>collectTraffic(fetchImpl,run)),
-    safe('fuel',()=>collectFuel(fetchImpl))
+    safe('fuel',()=>collectFuel(fetchImpl)),
+    safe('tides',()=>collectTides(fetchImpl))
   ]);
   const local=collectLocal(run,now);
   return {
     generatedAt:new Date(now).toISOString(),
-    weather, air, vigilance, floods, transport, traffic, fuel,
-    tides:{ status:'official-link', source:'SHOM', url:'https://maree.shom.fr/', ports:['Saint-Nazaire','Pornic','Le Croisic'] },
+    weather, air, vigilance, floods, transport, traffic, fuel, tides,
     agenda:{ status:'ok', items:local.agenda },
     jobs:{ status:'ok', items:local.jobs },
     services:{ status:'ok', items:local.services }
