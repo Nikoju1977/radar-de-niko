@@ -1,8 +1,8 @@
 /* Radar de Niko — service worker.
  * Réseau d'abord pour la veille (toujours la plus fraîche en ligne),
  * cache en repli : hors ligne, la dernière veille reçue reste lisible. */
-const CACHE = 'radar-v3';
-const SHELL = ['./', 'index.html', 'quotidien.html', 'facebook.txt', 'radar.xml', 'radar.jsonl', 'manifest.webmanifest',
+const CACHE = 'radar-v4';
+const SHELL = ['./', 'index.html', 'quotidien.html', 'v3/index.html', 'v3/radar-v3.json', 'facebook.txt', 'radar.xml', 'radar.jsonl', 'manifest.webmanifest',
                'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon-32.png'];
 
 self.addEventListener('install', e => {
