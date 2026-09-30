@@ -77,7 +77,7 @@ async function openMeteoFranceFor(place, fetchImpl) {
   u.searchParams.set('models', 'meteofrance_seamless');
   u.searchParams.set('forecast_days', '1');
   u.searchParams.set('current', 'temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,precipitation');
-  u.searchParams.set('daily', 'temperature_2m_min,temperature_2m_max,precipitation_probability_max,weather_code,wind_gusts_10m_max,sunrise,sunset');
+  u.searchParams.set('daily', 'temperature_2m_min,temperature_2m_max,precipitation_sum,weather_code,wind_gusts_10m_max,sunrise,sunset');
   const j = await getJSON(u, {}, fetchImpl);
   if (!Number.isFinite(Number(j.current?.temperature_2m))) throw new Error('Météo-France model data missing');
   return {
@@ -88,7 +88,8 @@ async function openMeteoFranceFor(place, fetchImpl) {
     gust: j.current?.wind_gusts_10m ?? dailyAt(j,'wind_gusts_10m_max'),
     min: dailyAt(j,'temperature_2m_min'),
     max: dailyAt(j,'temperature_2m_max'),
-    rainRisk: dailyAt(j,'precipitation_probability_max'),
+    rainRisk: null,
+    rainMm: dailyAt(j,'precipitation_sum'),
     sunrise: dailyAt(j,'sunrise'),
     sunset: dailyAt(j,'sunset'),
     provider:'Open-Meteo / Météo-France AROME + ARPEGE'
@@ -113,9 +114,10 @@ async function metNorwayFor(place, fetchImpl) {
     ?? first?.data?.next_6_hours?.summary?.symbol_code
     ?? '';
   const dayFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
-  const today=dayFmt.format(new Date());
+  const today=dayFmt.format(new Date(first.time));
   const dayRows=rows.filter(r=>dayFmt.format(new Date(r.time))===today);
   const temps=dayRows.map(r=>Number(r?.data?.instant?.details?.air_temperature)).filter(Number.isFinite);
+  const precip=dayRows.map(r=>Number(r?.data?.next_1_hours?.details?.precipitation_amount)).filter(Number.isFinite);
   const windMs=Number(details.wind_speed);
   const gustMs=Number(details.wind_speed_of_gust);
   return {
@@ -127,6 +129,7 @@ async function metNorwayFor(place, fetchImpl) {
     min:temps.length?Math.min(...temps):null,
     max:temps.length?Math.max(...temps):null,
     rainRisk:null,
+    rainMm:precip.length?precip.reduce((a,b)=>a+b,0):null,
     sunrise:null,
     sunset:null,
     provider:'MET Norway Locationforecast 2.0'
