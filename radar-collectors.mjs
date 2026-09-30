@@ -37,6 +37,7 @@ defineCollector({
       publishedAt: t.created_at,
       author: t.username,
       summary: t.text,
+      imageUrl: t.imageUrl,
       score: (t.like_count ?? 0) + 2 * (t.retweet_count ?? 0)
     }));
   }
@@ -56,6 +57,7 @@ defineCollector({
       publishedAt: p.created_utc ? new Date(p.created_utc * 1000).toISOString() : null,
       author: p.author,
       summary: p.selftext,
+      imageUrl: p.imageUrl,
       score: p.score
     }));
   }
@@ -74,6 +76,7 @@ defineCollector({
       publishedAt: v.publishedAt,
       author: v.channelTitle,
       summary: v.description,
+      imageUrl: v.thumbnail,
       score: v.viewCount
     }));
   }
@@ -93,6 +96,7 @@ defineCollector({
       publishedAt: r.publishedDate,
       author: r.author,
       summary: r.text ?? r.highlights?.join(' … '),
+      imageUrl: r.imageUrl,
       score: r.score != null ? Math.round(r.score * 100) : null
     }));
   }
@@ -111,7 +115,8 @@ defineCollector({
       url: n.url,
       publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null,
       author: n.source,
-      summary: n.description
+      summary: n.description,
+      imageUrl: n.imageUrl
     }));
   }
 });
@@ -121,7 +126,7 @@ defineCollector({
   collect: async ({ query, since, signal }) => {
     const raw = await reach('bing', { query, since, limit: 40, signal });
     return raw.map(n => ({
-      title: n.title, url: n.url, author: n.source, summary: n.description,
+      title: n.title, url: n.url, author: n.source, summary: n.description, imageUrl: n.imageUrl,
       publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null
     }));
   }
@@ -134,7 +139,7 @@ defineCollector({
     const raw = await reach('feeds', { query, since, limit: 300, signal });
     if (raw.failedFeeds?.length) log?.(`flux en échec : ${raw.failedFeeds.join(' ; ')}`);
     return raw.map(n => ({
-      title: n.title, url: n.url, author: n.feed, summary: n.description,
+      title: n.title, url: n.url, author: n.feed, summary: n.description, imageUrl: n.imageUrl,
       publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null
     }));
   }
@@ -146,7 +151,7 @@ defineCollector({
     const raw = await reach('bluesky', { query, since, limit: 50, signal });
     return raw.map(p => ({
       title: p.text.split('\n')[0].slice(0, 180), url: p.url, publishedAt: p.createdAt,
-      author: p.handle, summary: p.text, score: p.likeCount + 2 * p.repostCount
+      author: p.handle, summary: p.text, imageUrl: p.imageUrl, score: p.likeCount + 2 * p.repostCount
     }));
   }
 });
@@ -157,7 +162,7 @@ defineCollector({
     const raw = await reach('mastodon', { query, since, limit: 60, signal });
     return raw.map(p => ({
       title: p.text.slice(0, 180), url: p.url, publishedAt: p.createdAt,
-      author: p.acct, summary: p.text, score: p.favourites + 2 * p.reblogs
+      author: p.acct, summary: p.text, imageUrl: p.imageUrl, score: p.favourites + 2 * p.reblogs
     }));
   }
 });
