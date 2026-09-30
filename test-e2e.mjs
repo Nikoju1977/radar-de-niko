@@ -27,7 +27,7 @@ process.env.TWITTER_BEARER_TOKEN = 'k';
 const iso = h => new Date(Date.now() - h * 36e5).toISOString();
 
 const RSS = (items) => `<?xml version="1.0"?><rss><channel>${items.map(i =>
-  `<item><title>${i.t}</title><link>${i.u}</link><pubDate>${new Date(Date.now() - i.h * 36e5).toUTCString()}</pubDate>${i.s ? `<source url="x">${i.s}</source>` : ''}<description>${i.d ?? ''}</description></item>`).join('')}</channel></rss>`;
+  `<item><title>${i.t}</title><link>${i.u}</link><pubDate>${new Date(Date.now() - i.h * 36e5).toUTCString()}</pubDate>${i.s ? `<source url="x">${i.s}</source>` : ''}${i.img ? `<media:content url="${i.img}" medium="image"/>` : ''}<description>${i.d ?? ''}</description></item>`).join('')}</channel></rss>`;
 const ATOM = (items) => `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">${items.map(i =>
   `<entry><title>${i.t}</title><link href="${i.u}"/><updated>${iso(i.h)}</updated><author><name>/u/${i.a}</name></author><content type="html">${i.d ?? ''}</content></entry>`).join('')}</feed>`;
 
@@ -39,7 +39,7 @@ globalThis.fetch = async (url, init = {}) => {
   });
 
   if (u.includes('news.google.com')) return reply(RSS([
-    { t: 'Châteaubriant : le marché du mercredi déplacé - Ouest-France', u: 'https://www.ouest-france.fr/marche', h: 1, s: 'Ouest-France' }]));
+    { t: 'Châteaubriant : le marché du mercredi déplacé - Ouest-France', u: 'https://www.ouest-france.fr/marche', h: 1, s: 'Ouest-France', img: 'https://images.example.test/marche.jpg' }]));
   if (u.includes('bing.com/news')) return reply(RSS([
     { t: 'Blain : le château rouvre', u: 'http://www.bing.com/news/apiclick.aspx?url=https%3a%2f%2factu.fr%2fblain-chateau&c=1', h: 2 }]));
   if (u.includes('actu.fr/l-eclaireur')) return reply(RSS([
@@ -58,18 +58,19 @@ globalThis.fetch = async (url, init = {}) => {
     { t: 'Travaux RN171 à Nozay', u: 'https://www.reddit.com/r/nantes/comments/rn171/', h: 4, a: 'local44', d: '&lt;p&gt;Déviation&lt;/p&gt;' }]));
   if (u.includes('api.bsky.app')) return reply({ posts: [
     { uri: 'at://did:plc:x/app.bsky.feed.post/3kabc', author: { handle: 'nantes.bsky.social' },
-      record: { text: 'Grève TAN demain à Nantes\nTrams perturbés', createdAt: iso(1.5) }, likeCount: 4, repostCount: 1 }] });
+      record: { text: 'Grève TAN demain à Nantes\nTrams perturbés', createdAt: iso(1.5) },
+      embed: { images: [{ thumb: 'https://images.example.test/bsky.jpg' }] }, likeCount: 4, repostCount: 1 }] });
   if (u.includes('/api/v1/timelines/tag/')) return reply(u.includes('mastodon.social/api/v1/timelines/tag/nantes') ? [
     { url: 'https://mastodon.social/@a/1', created_at: iso(2.5), visibility: 'public', reblog: null,
-      content: '<p>Concert gratuit ce soir à <a href="x">#Nantes</a></p>', account: { acct: 'a' }, favourites_count: 2, reblogs_count: 0 }] : []);
+      content: '<p>Concert gratuit ce soir à <a href="x">#Nantes</a></p>', account: { acct: 'a' }, media_attachments: [{ preview_url: 'https://images.example.test/masto.jpg' }], favourites_count: 2, reblogs_count: 0 }] : []);
   if (u.includes('googleapis.com')) return reply({ items: [
-    { id: { videoId: 'v1' }, snippet: { title: 'Reportage Ancenis', publishedAt: iso(5), channelTitle: 'TV44', description: 'Ancenis' } }] });
+    { id: { videoId: 'v1' }, snippet: { title: 'Reportage Ancenis', publishedAt: iso(5), channelTitle: 'TV44', description: 'Ancenis', thumbnails: { high: { url: 'https://images.example.test/youtube.jpg' } } } }] });
   if (u.includes('api.exa.ai')) return reply({ results: [
     { title: 'La Meilleraye-de-Bretagne inaugure sa médiathèque', url: 'https://actu.fr/meilleraye?fbclid=zz', publishedDate: iso(6), score: 0.8 }] });
   if (u.includes('api.twitter.com')) return reply({
-    data: [{ id: '1', text: 'Conseil municipal de Châteaubriant ce soir', created_at: iso(0.5), author_id: 'u1',
+    data: [{ id: '1', text: 'Conseil municipal de Châteaubriant ce soir', created_at: iso(0.5), author_id: 'u1', attachments: { media_keys: ['m1'] },
              public_metrics: { like_count: 3, retweet_count: 1 } }],
-    includes: { users: [{ id: 'u1', username: 'ouestfrance44' }] }, meta: {} });
+    includes: { users: [{ id: 'u1', username: 'ouestfrance44' }], media: [{ media_key: 'm1', type: 'photo', url: 'https://images.example.test/twitter.jpg' }] }, meta: {} });
 
   throw new Error('route non simulée : ' + u);
 };
@@ -94,6 +95,9 @@ ok('dates valides après mapping',
 
 ok('URLs absolues après mapping',
    run.items.every(i => /^https?:\/\//.test(i.url)));
+ok('images propagées et sécurisées',
+   run.items.some(i => i.imageUrl === 'https://images.example.test/youtube.jpg') &&
+   run.items.filter(i => i.imageUrl).every(i => /^https?:\/\//.test(i.imageUrl)));
 
 ok('doublons inter-sources fusionnés (Google News vs flux France 3 avec utm)',
    run.dupes.length >= 1 && run.items.filter(i => i.url.includes('ouest-france.fr/marche')).length === 1);
@@ -135,6 +139,8 @@ ok('quotidien : cahier jeux complet',
    dailyHtml.includes('Mots croisés du Pays') && dailyHtml.includes('Mot mêlé régional'));
 ok('quotidien : partage Facebook prêt',
    facebook.includes('LE QUOTIDIEN DU RADAR 44') && facebook.includes('quotidien.html'));
+ok('quotidien : images intégrées au rendu', dailyHtml.includes('story-photo') || dailyHtml.includes('lead-photo'));
+ok('quotidien : export PDF A4 optimisé', dailyHtml.includes('@page{size:A4') && dailyHtml.includes('id="pdf"') && dailyHtml.includes('exportPdf'));
 
 run.items[0].title = '<script>alert(1)</script> & co';
 const html = toHTML(run);
