@@ -10,9 +10,9 @@ const text = body => ({ok:true,status:200,json:async()=>JSON.parse(body),text:as
 
 const fetchImpl=async url=>{
   const u=String(url);
-  if(u.includes('api.open-meteo.com/v1/forecast')) return json({
+  if(u.includes('api.open-meteo.com/v1/meteofrance')) return json({
     current:{temperature_2m:15.4,weather_code:2,wind_speed_10m:18,wind_gusts_10m:31,precipitation:0},
-    daily:{temperature_2m_min:[9.2],temperature_2m_max:[18.6],precipitation_probability_max:[35],weather_code:[2],wind_gusts_10m_max:[39],sunrise:['2026-09-30T07:58'],sunset:['2026-09-30T19:45']}
+    daily:{temperature_2m_min:[9.2],temperature_2m_max:[18.6],precipitation_sum:[3.4],weather_code:[2],wind_gusts_10m_max:[39],sunrise:['2026-09-30T07:58'],sunset:['2026-09-30T19:45']}
   });
   if(u.includes('air-quality-api.open-meteo.com')) return json({current:{european_aqi:27,pm2_5:7,pm10:12,nitrogen_dioxide:8,ozone:64}});
   if(u.includes('marine-api.open-meteo.com')) return json({hourly:{
@@ -46,6 +46,8 @@ const run={items:[
 
 const s=await collectDailyServices(run,{now,fetchImpl,env:{}});
 ok('météo multi-villes',s.weather.status==='ok'&&s.weather.locations.length===3);
+ok('météo utilise le couple AROME/ARPEGE',s.weather.locations.every(w=>/AROME \+ ARPEGE/.test(w.provider))&&s.weather.fallbackCount===0);
+ok('météo affiche le cumul de pluie',s.weather.locations.every(w=>w.rainMm===3.4));
 ok('soleil inclus dans la météo',Boolean(s.weather.locations[0].sunrise&&s.weather.locations[0].sunset));
 ok('air européen',s.air.status==='ok'&&s.air.aqi===27&&s.air.label==='Correct');
 ok('vigilance dégrade proprement sans secret',s.vigilance.status==='unconfigured');
@@ -59,3 +61,19 @@ ok('agenda / emploi / services',s.agenda.items.length&&s.jobs.items.length&&s.se
 const html=servicesPanel(s);
 ok('rendu Aujourd’hui dans le 44',html.includes('Aujourd’hui dans le 44')&&html.includes('Marées · estimation')&&html.includes('PM')&&html.includes('BM')&&html.includes('horaires officiels SHOM')&&html.includes('Carburants 44'));
 ok('ligne Facebook météo',/MÉTÉO/.test(servicesFacebookLine(s)));
+
+const fallbackFetch=async url=>{
+  const u=String(url);
+  if(u.includes('api.open-meteo.com/v1/meteofrance')) return {ok:false,status:503,json:async()=>({}),text:async()=>''};
+  if(u.includes('api.met.no/weatherapi/locationforecast/2.0/compact')) return json({
+    properties:{timeseries:[
+      {time:'2026-09-30T06:00:00Z',data:{instant:{details:{air_temperature:11,wind_speed:4,wind_speed_of_gust:7}},next_1_hours:{summary:{symbol_code:'partlycloudy_day'},details:{precipitation_amount:0.2}}}},
+      {time:'2026-09-30T12:00:00Z',data:{instant:{details:{air_temperature:17,wind_speed:5,wind_speed_of_gust:8}},next_1_hours:{summary:{symbol_code:'rainshowers_day'},details:{precipitation_amount:1.1}}}},
+      {time:'2026-09-30T18:00:00Z',data:{instant:{details:{air_temperature:13,wind_speed:3,wind_speed_of_gust:6}},next_1_hours:{summary:{symbol_code:'cloudy'},details:{precipitation_amount:0.4}}}}
+    ]}
+  });
+  return fetchImpl(url);
+};
+const sf=await collectDailyServices(run,{now,fetchImpl:fallbackFetch,env:{}});
+ok('MET Norway prend le relais automatiquement',sf.weather.status==='ok'&&sf.weather.fallbackCount===3&&sf.weather.locations.every(w=>w.fallback&&/MET Norway/.test(w.provider)));
+ok('fallback conserve température, vent et pluie',sf.weather.locations.every(w=>w.min===11&&w.max===17&&w.rainMm===1.7&&w.wind>0));
