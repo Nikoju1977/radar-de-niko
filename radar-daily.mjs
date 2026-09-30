@@ -69,8 +69,11 @@ export function buildDaily(run, now = Date.now(), v3Graph = null) {
     .sort((a,b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
   const groups = new Map(THEMES.map(([name]) => [name, []]));
   for (const item of items) groups.get(themeFor(item)).push(item);
-  const lead = [...items].sort((a,b) => leadScore(b, now) - leadScore(a, now))[0] ?? null;
   const graph = v3Graph ?? buildRadarV3(run, now);
+  const eventById = new Map(graph.events.map(e => [e.id, e]));
+  const eventFor = i => eventById.get(graph.articleToEvent[i.id]);
+  const editorialScore = i => leadScore(i, now) + Math.max(0, (eventFor(i)?.sourceCount ?? 1) - 1) * 22;
+  const lead = [...items].sort((a,b) => editorialScore(b) - editorialScore(a))[0] ?? null;
   return { items, groups, now, lead, graph };
 }
 
@@ -183,12 +186,18 @@ export function toDailyHTML(run, {
   const note = nikoNote(d);
   const eventById = new Map(d.graph.events.map(e => [e.id, e]));
   const eventFor = i => eventById.get(d.graph.articleToEvent[i.id]);
+  const renderedEvents = new Set();
+  const leadEvent = lead ? eventFor(lead) : null;
+  if (leadEvent) renderedEvents.add(leadEvent.id);
   let photoBudget = 8;
   const sections = [...d.groups.entries()].filter(([, items]) => items.some(i => i.id !== lead?.id)).map(([theme, items]) => {
     const body=items.map(i => {
+      const event = eventFor(i);
+      if (event && renderedEvents.has(event.id)) return '';
+      if (event) renderedEvents.add(event.id);
       const usePhoto = i.id !== lead?.id && Boolean(i.imageUrl) && photoBudget > 0;
       if (usePhoto) photoBudget--;
-      return articleRow(i, lead?.id, usePhoto, eventFor(i));
+      return articleRow(i, lead?.id, usePhoto, event);
     }).join('');
     return `<section class="theme" id="${slug(theme)}"><h2>${esc(theme)} <span>${items.length}</span></h2><div class="columns">${body}</div></section>`;
   }).join('');
@@ -286,7 +295,7 @@ footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:v
   <img class="brand-mark" src="icons/icon-192.png" alt="Radar 44" width="48" height="48">
   <div class="kicker">Toute l’actualité régionale des dernières 24 heures</div>
   <h1>${esc(title)}</h1>
-  <p class="deck">${esc(DATE.format(new Date(d.now)))} · ${d.items.length} informations retenues et classées par thématiques</p>
+  <p class="deck">${esc(DATE.format(new Date(d.now)))} · ${d.items.length} articles regroupés en ${d.graph.stats.events} sujets</p>
   <div class="actions">
     <a href="${esc(home)}">← Radar en direct</a>
     <a href="v3/">◎ Événements V3</a>
