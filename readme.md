@@ -90,7 +90,7 @@ Le bandeau pratique regroupe météo pour Châteaubriant/Nantes/Saint-Nazaire, l
 | Trafic Nantes | aucune | Nantes Métropole Open Data |
 | SNCF temps réel | aucune | SIRI Lite via transport.data.gouv.fr |
 | Carburants | aucune | DGCCRF / data.economie.gouv.fr |
-| Marées | aucune | lien vers le portail officiel SHOM |
+| Marées | aucune | extrema indicatifs via Open-Meteo marine + lien vers le SHOM, référence officielle ; ne pas utiliser pour la navigation |
 
 En local : copier `.env.example` en `.env`, il est chargé automatiquement.
 Une source sans clé est écartée avant le run, pas comptée en échec.
