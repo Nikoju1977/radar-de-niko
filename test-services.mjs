@@ -15,6 +15,10 @@ const fetchImpl=async url=>{
     daily:{temperature_2m_min:[9.2],temperature_2m_max:[18.6],precipitation_probability_max:[35],weather_code:[2],wind_gusts_10m_max:[39],sunrise:['2026-09-30T07:58'],sunset:['2026-09-30T19:45']}
   });
   if(u.includes('air-quality-api.open-meteo.com')) return json({current:{european_aqi:27,pm2_5:7,pm10:12,nitrogen_dioxide:8,ozone:64}});
+  if(u.includes('marine-api.open-meteo.com')) return json({hourly:{
+    time:['2026-09-30T00:00','2026-09-30T01:00','2026-09-30T02:00','2026-09-30T03:00','2026-09-30T04:00','2026-09-30T05:00','2026-09-30T06:00'],
+    sea_level_height_msl:[0,1,2,1,0,-1,0]
+  }});
   if(u.includes('vigicrues.gouv.fr')) return json({features:[{properties:{NomEntVigiCru:'Loire aval',NivVigi:2}},{properties:{name:'Autre bassin',NivVigi:1}}]});
   if(u.includes('sncf-siri-lite-situation-exchange')) return text('<Siri><PtSituationElement><Summary>Perturbation TER Nantes Saint-Nazaire</Summary><Description>Retard de 15 minutes</Description></PtSituationElement></Siri>');
   if(u.includes('fluidite-axes-routiers')) return json({total_count:889,results:[{etat:'fluide'}]});
@@ -43,7 +47,8 @@ ok('Vigicrues connecté',s.floods.status==='ok'&&s.floods.count>=1);
 ok('transport SNCF + Radar',s.transport.status==='ok'&&s.transport.alerts.length>=1&&s.transport.radar.length>=1);
 ok('trafic détecté',s.traffic.status==='ok'&&s.traffic.items.length>=1);
 ok('carburants officiels agrégés',s.fuel.status==='ok'&&s.fuel.fuels.some(x=>x.name==='Gazole'&&x.min===1.68));
+ok('marées indicatives pour les trois ports',s.tides.status==='ok'&&s.tides.ports.length===3&&s.tides.ports.every(p=>p.extrema.some(e=>e.type==='PM')&&p.extrema.some(e=>e.type==='BM')));
 ok('agenda / emploi / services',s.agenda.items.length&&s.jobs.items.length&&s.services.items.length);
 const html=servicesPanel(s);
-ok('rendu Aujourd’hui dans le 44',html.includes('Aujourd’hui dans le 44')&&html.includes('Marées · SHOM')&&html.includes('Carburants 44'));
+ok('rendu Aujourd’hui dans le 44',html.includes('Aujourd’hui dans le 44')&&html.includes('Marées · estimation')&&html.includes('PM')&&html.includes('BM')&&html.includes('horaires officiels SHOM')&&html.includes('Carburants 44'));
 ok('ligne Facebook météo',/MÉTÉO/.test(servicesFacebookLine(s)));
