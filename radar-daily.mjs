@@ -80,36 +80,36 @@ export function buildDaily(run, now = Date.now(), v3Graph = null) {
 const SERIOUS_NEWS = /(mort|décès|deces|tué|tue|meurtre|viol\b|agression sexuelle|accident mortel|incendie mortel|disparition inquiétante|disparition inquietante)/i;
 const NIKO_LINES = {
   'Mobilité & travaux': [
-    'Entre travaux, déviations et horaires, le GPS du 44 mérite presque une convention collective.',
-    'Aujourd’hui, le cône orange reste l’un des habitants les plus visibles de Loire-Atlantique.'
+    'Une déviation, c’est une route qui te dit : “Tu voulais aller là ? Intéressant. Moi non plus.”',
+    'Le cône orange est fascinant : il ne bouge jamais, mais c’est lui qui décide où tout le monde va.'
   ],
   'Économie & emploi': [
-    'Le 44 recrute, investit et ouvre des portes : même les CV ont intérêt à arriver à l’heure.',
-    'L’économie locale bouge. Les machines à café des zones d’activité aussi.'
+    'On dit que le marché bouge. Personne ne l’a jamais vu marcher, mais tout le monde court derrière.',
+    'Une offre d’emploi, c’est deux inconnus qui se demandent poliment s’ils pourraient supporter de se voir cinq jours par semaine.'
   ],
   'Environnement & agriculture': [
-    'Entre eau, champs et biodiversité, la Loire-Atlantique rappelle que la météo n’est jamais un simple sujet de conversation.',
-    'Ici, même un nuage peut finir avec un dossier, trois cartes et une réunion publique.'
+    'La météo locale, c’est la seule chronique où un nuage peut avoir plus d’influence qu’un conseil d’administration.',
+    'On parle beaucoup de la terre. Elle, de son côté, continue son truc sans avoir demandé à être invitée à la réunion.'
   ],
   'Éducation & jeunesse': [
-    'Écoles et formations bougent : certains cartables ont désormais un agenda plus chargé que nous.',
-    'La jeunesse du 44 prépare demain pendant que nous cherchons encore où nous avons posé nos clés.'
+    'À l’école, on prépare l’avenir. C’est ambitieux, surtout qu’on n’a déjà pas complètement compris mardi prochain.',
+    'Les jeunes apprennent pour demain pendant que les adultes font encore semblant de savoir où ils vont.'
   ],
   'Culture & sorties': [
-    'Bonne nouvelle : dans le 44, il reste toujours une excellente raison de sortir de chez soi.',
-    'Concerts, expos, spectacles : le canapé vient officiellement de perdre un point.'
+    'Un concert, c’est des centaines de gens qui acceptent ensemble de ressentir quelque chose sans faire de tableau Excel.',
+    'Une exposition réussie, c’est quand tu regardes un objet immobile et qu’il te donne soudain l’impression que c’est toi qui n’avances plus.'
   ],
   'Sports': [
-    'Le sport local rappelle une vérité simple : le canapé n’a encore gagné aucun championnat.',
-    'Le 44 transpire, marque, court et pédale. Rien que de lire le programme, on a déjà soif.'
+    'Le sport, c’est magnifique : on invente une ligne, puis on consacre des années à essayer d’arriver avant les autres de l’autre côté.',
+    'Un match, c’est quatre-vingt-dix minutes où des adultes très sérieux poursuivent une balle comme si elle détenait enfin les réponses.'
   ],
   'Institutions & vie publique': [
-    'Conseils, arrêtés, budgets : la démocratie locale confirme qu’elle adore les PDF de 84 pages.',
-    'La vie publique locale avance à son rythme : beaucoup de dossiers, et rarement une pénurie de virgules.'
+    'Un dossier administratif, c’est une feuille qui a réussi à convaincre qu’elle avait besoin de dix-sept autres feuilles pour exister.',
+    'La démocratie locale, c’est beaucoup de gens qui discutent longtemps pour décider où mettre quelque chose qui était déjà presque là.'
   ],
   'Vie locale': [
-    'Le 44 continue de produire plus de sujets qu’un groupe WhatsApp de lotissement.',
-    'Ici, une petite info locale sait parfois faire davantage de kilomètres qu’un TER un jour de travaux.'
+    'L’actualité locale est rassurante : le monde est immense, mais quelqu’un doit quand même décider où mettre le nouveau passage piéton.',
+    'Dans une commune, tout peut devenir un événement. C’est peut-être ça, le vrai luxe : encore être surpris par une salle polyvalente.'
   ]
 };
 
