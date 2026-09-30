@@ -4,6 +4,7 @@
  */
 import { toGamesHTML } from './radar-games.mjs';
 import { buildRadarV3, mediaFor, journalistFor } from './radar-v3.mjs';
+import { servicesPanel, servicesFacebookLine, SERVICES_CSS } from './radar-services-view.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -134,7 +135,8 @@ const slug = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
 
 export function toFacebookText(run, {
   url = 'https://nikoju1977.github.io/radar-de-niko/quotidien.html',
-  v3Graph = null
+  v3Graph = null,
+  services = null
 } = {}) {
   const d = buildDaily(run, Date.now(), v3Graph);
   const lines = [
@@ -145,6 +147,8 @@ export function toFacebookText(run, {
     ''
   ];
   if (d.lead) lines.push('À LA UNE — ' + d.lead.title, '');
+  const practicalLine = servicesFacebookLine(services);
+  if (practicalLine) lines.push(practicalLine, '');
   lines.push('LA NOTE DE NIKO — ' + nikoNote(d), '');
   const seenEvents = new Set();
   for (const [theme, items] of d.groups) {
@@ -190,7 +194,8 @@ export function toDailyHTML(run, {
   title = 'Le Quotidien du Radar 44',
   home = './',
   facebookUrl = 'facebook.txt',
-  v3Graph = null
+  v3Graph = null,
+  services = null
 } = {}) {
   const d = buildDaily(run, Date.now(), v3Graph);
   const lead = d.lead;
@@ -228,7 +233,7 @@ export function toDailyHTML(run, {
     return count ? `<a href="#${slug(theme)}">${esc(theme)} <b>${count}</b></a>` : '';
   }).join('');
   const dayKey=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(d.now));
-  const shareJson=JSON.stringify(toFacebookText(run, { v3Graph: d.graph })).replace(/<\//g,'<\\/');
+  const shareJson=JSON.stringify(toFacebookText(run, { v3Graph: d.graph, services })).replace(/<\//g,'<\\/');
 
   return `<!doctype html>
 <html lang="fr"><head>
@@ -243,6 +248,7 @@ export function toDailyHTML(run, {
 <meta name="theme-color" content="#f2ecdf">
 <style>
 :root{--paper:#f2ecdf;--ink:#171512;--muted:#6b6258;--rule:#b5a898;--red:#982a20;--cream:#fbf7ed}
+${SERVICES_CSS}
 *{box-sizing:border-box}html{background:#d6cec1;color:var(--ink);font:16px/1.52 Georgia,"Times New Roman",serif}
 body{max-width:1120px;margin:0 auto;background:var(--paper);min-height:100vh;padding:24px clamp(16px,4vw,54px) 64px}
 .topline{display:flex;justify-content:space-between;gap:16px;border-block:1px solid var(--ink);padding:6px 0;font:700 11px/1.2 Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em}
@@ -332,11 +338,12 @@ footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:v
 </header>
 <nav class="toc" aria-label="Sommaire">${toc}</nav>
 <section class="edition-stats" aria-label="Indicateurs de l'édition"><div><b>${d.graph.stats.events}</b>sujets</div><div><b>${d.graph.stats.multiSourceEvents}</b>multi-sources</div><div><b>${d.graph.stats.media}</b>médias</div><div><b>${d.graph.stats.journalists}</b>signatures</div></section>
+${servicesPanel(services)}
 ${lead ? `<section class="lead">${storyPhoto(lead, "lead-photo", true)}<div><div class="kicker">À la une</div><h2><a href="${esc(lead.url)}" target="_blank" rel="noopener">${esc(lead.title)}</a></h2><p class="summary">${esc(lead.summary || 'Retrouvez l’article complet auprès de la source originale.')}</p></div><aside class="lead-side"><strong>${esc(themeFor(lead))}</strong><p>${esc(mediaFor(lead))}${journalistFor(lead) ? ' · ' + esc(journalistFor(lead)) : ''}</p><p>Publié à ${esc(TIME.format(new Date(lead.publishedAt)))}</p>${eventFor(lead)?.multiSource ? `<p><a href="v3/#${esc(eventFor(lead).id)}">${eventFor(lead).sourceCount} sources suivent ce sujet →</a></p>` : ''}<a href="${esc(lead.url)}" target="_blank" rel="noopener">Lire la source →</a></aside></section>` : ''}
 <aside class="niko-note"><div class="kicker">Chronique légère</div><h2>La note de Niko</h2><p>${esc(note)}</p></aside>
 <main>${sections || '<p class="empty">Aucune information régionale des dernières 24 heures pour cette édition.</p>'}</main>
 ${toGamesHTML(dayKey)}
-<footer>Le Quotidien du Radar 44 est une édition automatique de veille. Les titres, extraits et liens renvoient vers leurs sources d’origine. « La note de Niko » est une touche humoristique générée à partir des thèmes de l’édition et désactivée sur les sujets graves. Jeux générés localement pour cette édition.</footer>
+<footer>Le Quotidien du Radar 44 est une édition automatique de veille. Les titres, extraits et liens renvoient vers leurs sources d’origine. Les données pratiques proviennent de services ouverts ou officiels et peuvent être temporairement indisponibles. « La note de Niko » est une touche humoristique générée à partir des thèmes de l’édition et désactivée sur les sujets graves. Jeux générés localement pour cette édition.</footer>
 <script>
 (function(){
   var text=${shareJson};

@@ -1,0 +1,40 @@
+/** Rendu des données pratiques du Quotidien V4. */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CLOCK = new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'});
+const n = (v,d=0) => Number.isFinite(Number(v)) ? Number(v).toFixed(d).replace('.',',') : '—';
+const clock = v => { const d=new Date(v); return isNaN(d) ? '—' : CLOCK.format(d); };
+const links = (items,max=3) => (items ?? []).slice(0,max).map(i => '<li><a href="'+esc(i.url)+'" target="_blank" rel="noopener">'+esc(i.title)+'</a></li>').join('');
+
+export function servicesFacebookLine(s) {
+  if (s?.weather?.status !== 'ok' || !s.weather.locations?.length) return null;
+  const w=s.weather.locations[0];
+  return 'MÉTÉO — '+w.name+' : '+Math.round(w.min)+'° → '+Math.round(w.max)+'° · '+w.condition+(Number.isFinite(Number(w.rainRisk))?' · pluie '+Math.round(w.rainRisk)+'%':'');
+}
+
+export function servicesPanel(s) {
+  if (!s) return '<section class="today"><div class="today-head"><div><span>Services du jour</span><h2>Aujourd’hui dans le 44</h2></div><p>Données pratiques au prochain run connecté.</p></div></section>';
+  const weather = s.weather?.status === 'ok' ? (s.weather.locations ?? []).map(w =>
+    '<div class="weather-place"><b>'+esc(w.name)+'</b><strong>'+n(w.min)+'° → '+n(w.max)+'°</strong><span>'+esc(w.condition)+(Number.isFinite(Number(w.rainRisk))?' · pluie '+Math.round(w.rainRisk)+'%':'')+'</span><small>Vent '+n(w.wind)+' km/h · raf. '+n(w.gust)+'</small></div>'
+  ).join('') : '<p class="service-off">Météo temporairement indisponible.</p>';
+  const sun = s.weather?.status === 'ok' && s.weather.locations?.[0] ? '<div class="service-card"><span class="service-kicker">Soleil</span><b>↑ '+clock(s.weather.locations[0].sunrise)+' · ↓ '+clock(s.weather.locations[0].sunset)+'</b><small>'+esc(s.weather.locations[0].name)+'</small></div>' : '';
+  const air = s.air?.status === 'ok' ? '<div class="service-card"><span class="service-kicker">Qualité de l’air</span><b>'+esc(s.air.label)+(s.air.aqi!=null?' · '+esc(s.air.aqi):'')+'</b><small>AQI européen · '+esc(s.air.place)+'</small></div>' : '<div class="service-card muted"><span class="service-kicker">Air</span><b>Indisponible</b></div>';
+  const vigilance = s.vigilance?.status === 'ok' ? '<div class="service-card vigilance v'+esc(s.vigilance.colorId)+'"><span class="service-kicker">Vigilance Météo-France</span><b>'+esc(s.vigilance.color)+'</b><small>'+esc((s.vigilance.phenomena??[]).map(x=>x.name+' '+x.color).join(' · ')||'Aucun phénomène au-dessus du vert')+'</small></div>' : '<div class="service-card muted"><span class="service-kicker">Vigilance</span><b>'+(s.vigilance?.status==='unconfigured'?'Clé Météo-France à connecter':'Indisponible')+'</b></div>';
+  const floods = s.floods?.status === 'ok' ? '<div class="service-card"><span class="service-kicker">Vigicrues</span><b>'+esc(s.floods.color??'Vert')+'</b><small>'+esc((s.floods.names??[]).join(' · ')||'Aucun tronçon local signalé')+'</small></div>' : '<div class="service-card muted"><span class="service-kicker">Vigicrues</span><b>Indisponible</b></div>';
+  const fuel = s.fuel?.status === 'ok' ? '<div class="service-card fuel"><span class="service-kicker">Carburants 44</span><b>'+esc(s.fuel.stations)+' stations lues</b><small>'+esc((s.fuel.fuels??[]).slice(0,4).map(x=>x.name+' min. '+x.min.toFixed(3).replace('.',',')+' €').join(' · ')||'Prix non remontés')+'</small></div>' : '<div class="service-card muted"><span class="service-kicker">Carburants</span><b>Indisponible</b></div>';
+  const tide = s.tides?.status === 'ok'
+    ? '<a class="service-card tide" href="'+esc(s.tides.officialUrl||'https://maree.shom.fr/')+'" target="_blank" rel="noopener"><span class="service-kicker">Marées · estimation</span><b>'+
+      esc((s.tides.ports??[]).map(p=>p.name+' · '+((p.extrema??[]).slice(0,2).map(e=>e.type+' '+clock(e.time)).join(' · ')||'—')).join(' / '))+
+      '</b><small>Indicatif uniquement · horaires officiels SHOM →</small></a>'
+    : '<a class="service-card tide" href="https://maree.shom.fr/" target="_blank" rel="noopener"><span class="service-kicker">Marées · SHOM</span><b>Saint-Nazaire · Pornic · Le Croisic</b><small>Consulter les horaires officiels →</small></a>';
+  const trafficCount=(s.traffic?.items??[]).length;
+  const transportCount=(s.transport?.radar??[]).length+(s.transport?.alerts??[]).length;
+  const practical = '<div class="service-list"><h3>Circulation & transports</h3><p><b>'+trafficCount+'</b> signalement'+(trafficCount>1?'s':'')+' routier'+(trafficCount>1?'s':'')+' · <b>'+transportCount+'</b> info'+(transportCount>1?'s':'')+' transport</p><ul>'+links(s.traffic?.items,2)+links(s.transport?.radar,2)+'</ul></div>'+
+    '<div class="service-list"><h3>Agenda</h3><p><b>'+(s.agenda?.items?.length??0)+'</b> rendez-vous détectés</p><ul>'+links(s.agenda?.items,3)+'</ul></div>'+
+    '<div class="service-list"><h3>Emploi</h3><p><b>'+(s.jobs?.items?.length??0)+'</b> offres récentes</p><ul>'+links(s.jobs?.items,3)+'</ul></div>'+
+    '<div class="service-list"><h3>Services & travaux</h3><p><b>'+(s.services?.items?.length??0)+'</b> informations pratiques</p><ul>'+links(s.services?.items,3)+'</ul></div>';
+  return '<section class="today" id="aujourdhui"><div class="today-head"><div><span>Pratique · temps réel</span><h2>Aujourd’hui dans le 44</h2></div><p>Météo, mobilité, environnement et vie quotidienne.</p></div>'+
+    '<div class="weather-grid">'+weather+'</div><div class="service-grid">'+vigilance+floods+air+sun+fuel+tide+'</div>'+
+    '<div class="practical-grid">'+practical+'</div></section>';
+}
+
+export const SERVICES_CSS = '.today{margin:18px 0 26px;border-block:5px double var(--ink);padding:17px 0 20px}.today-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:12px}.today-head span,.service-kicker{font:800 10px Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--red)}.today-head h2{font:900 34px/1 Georgia,serif;margin:3px 0}.today-head p{color:var(--muted);margin:0}.weather-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink);border:1px solid var(--ink);margin-bottom:10px}.weather-place{background:var(--cream);padding:13px}.weather-place b,.weather-place strong,.weather-place span,.weather-place small{display:block}.weather-place strong{font:900 25px Georgia,serif;margin:3px 0}.weather-place span{font-size:13px}.weather-place small,.service-card small{color:var(--muted);margin-top:3px}.service-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.service-card{border:1px solid var(--rule);padding:11px;background:rgba(255,255,255,.2);text-decoration:none;color:var(--ink)}.service-card b,.service-card small{display:block}.service-card b{font:800 16px Arial,sans-serif;margin-top:4px}.service-card.v2{border-top:5px solid #e7cf31}.service-card.v3{border-top:5px solid #e78b25}.service-card.v4{border-top:5px solid #c92d24}.service-card.muted{opacity:.65}.practical-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:18px;border-top:1px solid var(--rule);padding-top:15px}.service-list h3{font:900 18px Georgia,serif;margin:0 0 5px}.service-list p{color:var(--muted);font-size:12px;margin:0 0 6px}.service-list ul{padding-left:17px;margin:0}.service-list li{font-size:12px;margin:4px 0}.service-list a{color:var(--ink)}.service-off{background:var(--cream);padding:12px;margin:0;grid-column:1/-1}@media(max-width:720px){.weather-grid,.service-grid,.practical-grid{grid-template-columns:1fr}.today-head{display:block}}@media print{.today{break-inside:avoid}.weather-grid,.service-grid{grid-template-columns:repeat(3,1fr)}.practical-grid{grid-template-columns:repeat(2,1fr)}}';
