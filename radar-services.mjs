@@ -129,7 +129,7 @@ async function metNorwayFor(place, fetchImpl) {
     min:temps.length?Math.min(...temps):null,
     max:temps.length?Math.max(...temps):null,
     rainRisk:null,
-    rainMm:precip.length?precip.reduce((a,b)=>a+b,0):null,
+    rainMm:precip.length?Math.round(precip.reduce((a,b)=>a+b,0)*10)/10:null,
     sunrise:null,
     sunset:null,
     provider:'MET Norway Locationforecast 2.0'
