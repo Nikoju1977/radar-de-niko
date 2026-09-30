@@ -37,13 +37,15 @@ export function isRegionalItem(item, now = Date.now()) {
   const t = Date.parse(item.publishedAt);
   if (!Number.isFinite(t) || t < now - 24 * 3600e3 || t > now + 5 * 60e3) return false;
   const text = [item.title, item.summary].filter(Boolean).join(' ');
-  return item.tags?.includes('44')
+  return item.source === 'emploi'
+    || item.tags?.includes('44')
     || LOCAL_SOURCE.test(item.author ?? '')
     || LOCAL_URL.test(item.url ?? '')
     || hasRegionalPlace(text);
 }
 
 export function themeFor(item) {
+  if (item.source === 'emploi') return 'Économie & emploi';
   // Le média/auteur ne doit jamais déterminer la rubrique (ex. "social.rebellion.global").
   const hay = [item.title, item.summary].filter(Boolean).join(' ');
   for (const [name, rx] of THEMES) if (rx.test(hay)) return name;
