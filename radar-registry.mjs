@@ -143,6 +143,7 @@ function normalizeItem(item, collector) {
     source: collector.source,
     collector: collector.id,
     author: item.author ?? item.user ?? null,
+    media: item.media ?? null,
     summary: typeof item.summary === 'string' ? item.summary.trim().slice(0, 800)
            : typeof item.text === 'string' ? item.text.trim().slice(0, 800) : null,
     imageUrl: safeMediaUrl(item.imageUrl ?? item.image ?? item.thumbnail ?? item.thumbnailUrl),
@@ -156,6 +157,7 @@ function dedupe(items) {
   const mergeRich = (primary, secondary) => ({
     ...primary,
     author: primary.author || secondary.author,
+    media: primary.media || secondary.media,
     summary: primary.summary || secondary.summary,
     imageUrl: primary.imageUrl || secondary.imageUrl,
     score: primary.score ?? secondary.score

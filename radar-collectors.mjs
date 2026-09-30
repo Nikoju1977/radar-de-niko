@@ -115,6 +115,7 @@ defineCollector({
       url: n.url,
       publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null,
       author: n.source,
+      media: n.source,
       summary: n.description,
       imageUrl: n.imageUrl
     }));
@@ -126,7 +127,7 @@ defineCollector({
   collect: async ({ query, since, signal }) => {
     const raw = await reach('bing', { query, since, limit: 40, signal });
     return raw.map(n => ({
-      title: n.title, url: n.url, author: n.source, summary: n.description, imageUrl: n.imageUrl,
+      title: n.title, url: n.url, author: n.source, media: n.source, summary: n.description, imageUrl: n.imageUrl,
       publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null
     }));
   }
@@ -139,7 +140,7 @@ defineCollector({
     const raw = await reach('feeds', { query, since, limit: 300, signal });
     if (raw.failedFeeds?.length) log?.(`flux en échec : ${raw.failedFeeds.join(' ; ')}`);
     return raw.map(n => ({
-      title: n.title, url: n.url, author: n.feed, summary: n.description, imageUrl: n.imageUrl,
+      title: n.title, url: n.url, author: n.author || n.feed, media: n.feed, summary: n.description, imageUrl: n.imageUrl,
       publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null
     }));
   }
@@ -154,7 +155,8 @@ defineCollector({
     return raw.map(n => ({
       title: n.title,
       url: n.url,
-      author: n.feed || n.author,
+      author: n.author || n.feed,
+      media: n.feed,
       summary: n.description,
       imageUrl: n.imageUrl,
       publishedAt: n.pubDate && !isNaN(Date.parse(n.pubDate)) ? new Date(n.pubDate).toISOString() : null,

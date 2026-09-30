@@ -33,6 +33,8 @@ Ajouter une source = ajouter un `defineCollector()`. Rien d'autre à toucher.
 | `radar-agent-reach.mjs` | Clients HTTP des plateformes (reprises, OAuth Reddit, parseur RSS) |
 | `radar-run.mjs` | Point d'entrée CLI |
 | `radar-page.mjs` | Page publique statique (balayage 24 h, filtres) |
+| `radar-daily.mjs` | Quotidien régional : une, thèmes, multi-sources, jeux et « La note de Niko » |
+| `radar-v3.mjs` | V3 : événements, chronologies, médias, journalistes et lieux |
 | `public/` | PWA : manifeste, service worker (lecture hors ligne), icônes, écrans de démarrage iOS |
 | `radar-sources.json` | Flux RSS fixes et hashtags Mastodon |
 
@@ -44,7 +46,7 @@ node radar-run.mjs --query "Châteaubriant" --since 2026-09-01 --out ./dist
 node radar-run.mjs --only reddit,exa
 ```
 
-Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`.
+Sorties dans `--out` : `radar.xml`, `radar.jsonl`, `radar.md`, `quotidien.html`, `v3/index.html` et `v3/radar-v3.json`.
 
 ## Application (PWA)
 
@@ -55,13 +57,21 @@ Installable depuis https://nikoju1977.github.io/radar-de-niko/ :
 Hors ligne, la dernière veille reçue reste lisible. Raccourcis : `?f=new` (nouveautés), `?f=l44` (Loire-Atlantique).
 Badge d'icône = nombre de nouveautés (Android ; iOS 16.4+ si les notifications sont autorisées).
 
+### Radar44 V3
+
+La vue `/v3/` regroupe les articles proches en **événements** et montre leur chronologie par média. Elle expose également les signatures journalistes détectées dans les flux RSS, les médias et les communes citées. Le regroupement est volontairement conservateur : il s'agit d'une aide à la lecture, pas d'une affirmation qu'un média a copié un autre.
+
+### Quotidien régional
+
+Le Quotidien affiche les indicateurs V3, les sujets suivis par plusieurs médias et un lien vers leur chronologie. **« La note de Niko »** ajoute une phrase humoristique déterministe liée au thème dominant du jour ; elle bascule vers une formulation sobre lorsque l'édition est dominée par des faits graves.
+
 ## Clés et sources
 
 | Source | Variable(s) | Sans clé |
 |---|---|---|
 | Google News (RSS) | aucune | fonctionne partout |
 | Bing News (RSS) | aucune | fonctionne partout |
-| Presse locale & nationale (`radar-sources.json`) | aucune | L'Éclaireur de Châteaubriant, France 3 PDL, ICI Loire Océan, Ouest-France, franceinfo, r/nantes |
+| Presse locale & nationale (`radar-sources.json`) | aucune | Actu44, Actu Nantes, L'Éclaireur de Châteaubriant, Pays de Retz, Presqu'île, Sèvre-et-Maine, France 3 PDL, ICI Loire Océan, Ouest-France, 20 Minutes Nantes, franceinfo, r/nantes |
 | Bluesky | `BSKY_HANDLE`, `BSKY_APP_PASSWORD` (optionnels, compte gratuit) | API publique, deux endpoints en repli — 403 intermittent depuis certaines IP GitHub |
 | Mastodon (fils par hashtag, instances et tags dans `radar-sources.json`) | aucune | fonctionne partout |
 | Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (optionnels) | flux Atom de recherche — fonctionne depuis GitHub Actions |
@@ -74,7 +84,7 @@ Une source sans clé est écartée avant le run, pas comptée en échec.
 
 ## CI (`.github/workflows/radar.yml`)
 
-- `push` sur `main` : syntaxe, 3 suites de tests, run stub, validation RSS.
+- `pull_request` vers `main` et `push` sur `main` : syntaxe, suites de tests, run stub, validation RSS et PWA.
 - Toutes les 15 minutes + déclenchement manuel (requête, sources, date plancher) :
   run réel avec les secrets du dépôt, digest dans le résumé du run,
   `radar.xml` / `radar.jsonl` / `radar.md` / `index.html` en artefact `radar`, puis publiés sur GitHub Pages.

@@ -139,7 +139,7 @@ footer a{color:var(--texte)}
 </head><body>
 <header>
   <h1>${esc(title)}</h1>
-  <p class="meta">Mis à jour le ${esc(stampFmt.format(new Date(now)))}, rafraîchi toutes les ${every} min. <a href="${esc(feedUrl)}">Flux RSS</a><a class="journal" href="quotidien.html">📰 Quotidien régional</a><button type="button" class="manual" id="manual-refresh" title="Lancer immédiatement Radar Auto">↻ Mise à jour maintenant</button><button type="button" class="install hide" id="inst">Installer l'app</button></p>
+  <p class="meta">Mis à jour le ${esc(stampFmt.format(new Date(now)))}, rafraîchi toutes les ${every} min. <a href="${esc(feedUrl)}">Flux RSS</a><a class="journal" href="quotidien.html">📰 Quotidien régional</a><a class="journal" href="v3/">◎ V3 événements</a><button type="button" class="manual" id="manual-refresh" title="Lancer immédiatement Radar Auto">↻ Mise à jour maintenant</button><button type="button" class="install hide" id="inst">Installer l'app</button></p>
 </header>
 <p class="offline hide" id="off">Hors ligne. Voici la dernière veille reçue, du ${esc(stampFmt.format(new Date(now)))}.</p>
 ${sweep(items, sources, now)}

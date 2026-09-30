@@ -3,6 +3,7 @@
  * Dernières 24 h, filtrées régionalement et classées par thématiques.
  */
 import { toGamesHTML } from './radar-games.mjs';
+import { buildRadarV3, mediaFor, journalistFor } from './radar-v3.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -39,7 +40,7 @@ export function isRegionalItem(item, now = Date.now()) {
   const text = [item.title, item.summary].filter(Boolean).join(' ');
   return item.source === 'emploi'
     || item.tags?.includes('44')
-    || LOCAL_SOURCE.test(item.author ?? '')
+    || LOCAL_SOURCE.test([item.author, item.media].filter(Boolean).join(' '))
     || LOCAL_URL.test(item.url ?? '')
     || hasRegionalPlace(text);
 }
@@ -56,29 +57,86 @@ function leadScore(item, now) {
   const ageHours = Math.max(0, (now - Date.parse(item.publishedAt)) / 36e5);
   let score = Math.max(0, 48 - ageHours);
   if (item.source === 'presse' || item.source === 'gnews') score += 80;
-  if (LOCAL_SOURCE.test(item.author ?? '') || LOCAL_URL.test(item.url ?? '')) score += 70;
+  if (LOCAL_SOURCE.test([item.author, item.media].filter(Boolean).join(' ')) || LOCAL_URL.test(item.url ?? '')) score += 70;
   if (item.tags?.includes('44')) score += 35;
   if (/^(mastodon|bluesky|reddit|twitter)$/i.test(item.source ?? '')) score -= 45;
   if (String(item.title ?? '').length >= 45) score += 8;
   return score;
 }
 
-export function buildDaily(run, now = Date.now()) {
+export function buildDaily(run, now = Date.now(), v3Graph = null) {
   const items = run.items.filter(i => isRegionalItem(i, now))
     .sort((a,b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
   const groups = new Map(THEMES.map(([name]) => [name, []]));
   for (const item of items) groups.get(themeFor(item)).push(item);
-  const lead = [...items].sort((a,b) => leadScore(b, now) - leadScore(a, now))[0] ?? null;
-  return { items, groups, now, lead };
+  const graph = v3Graph ?? buildRadarV3(run, now);
+  const eventById = new Map(graph.events.map(e => [e.id, e]));
+  const eventFor = i => eventById.get(graph.articleToEvent[i.id]);
+  const editorialScore = i => leadScore(i, now) + Math.max(0, (eventFor(i)?.sourceCount ?? 1) - 1) * 22;
+  const lead = [...items].sort((a,b) => editorialScore(b) - editorialScore(a))[0] ?? null;
+  return { items, groups, now, lead, graph };
+}
+
+const SERIOUS_NEWS = /(mort|décès|deces|tué|tue|meurtre|viol\b|agression sexuelle|accident mortel|incendie mortel|disparition inquiétante|disparition inquietante)/i;
+const NIKO_LINES = {
+  'Mobilité & travaux': [
+    'Entre travaux, déviations et horaires, le GPS du 44 mérite presque une convention collective.',
+    'Aujourd’hui, le cône orange reste l’un des habitants les plus visibles de Loire-Atlantique.'
+  ],
+  'Économie & emploi': [
+    'Le 44 recrute, investit et ouvre des portes : même les CV ont intérêt à arriver à l’heure.',
+    'L’économie locale bouge. Les machines à café des zones d’activité aussi.'
+  ],
+  'Environnement & agriculture': [
+    'Entre eau, champs et biodiversité, la Loire-Atlantique rappelle que la météo n’est jamais un simple sujet de conversation.',
+    'Ici, même un nuage peut finir avec un dossier, trois cartes et une réunion publique.'
+  ],
+  'Éducation & jeunesse': [
+    'Écoles et formations bougent : certains cartables ont désormais un agenda plus chargé que nous.',
+    'La jeunesse du 44 prépare demain pendant que nous cherchons encore où nous avons posé nos clés.'
+  ],
+  'Culture & sorties': [
+    'Bonne nouvelle : dans le 44, il reste toujours une excellente raison de sortir de chez soi.',
+    'Concerts, expos, spectacles : le canapé vient officiellement de perdre un point.'
+  ],
+  'Sports': [
+    'Le sport local rappelle une vérité simple : le canapé n’a encore gagné aucun championnat.',
+    'Le 44 transpire, marque, court et pédale. Rien que de lire le programme, on a déjà soif.'
+  ],
+  'Institutions & vie publique': [
+    'Conseils, arrêtés, budgets : la démocratie locale confirme qu’elle adore les PDF de 84 pages.',
+    'La vie publique locale avance à son rythme : beaucoup de dossiers, et rarement une pénurie de virgules.'
+  ],
+  'Vie locale': [
+    'Le 44 continue de produire plus de sujets qu’un groupe WhatsApp de lotissement.',
+    'Ici, une petite info locale sait parfois faire davantage de kilomètres qu’un TER un jour de travaux.'
+  ]
+};
+
+export function nikoNote(d) {
+  const safe = d.items.filter(i => !SERIOUS_NEWS.test([i.title, i.summary].filter(Boolean).join(' ')));
+  if (!safe.length && d.items.length) return 'Aujourd’hui, l’actualité appelle surtout à la sobriété. La note de Niko garde son sourire pour demain.';
+  if (!d.items.length) return 'Aujourd’hui, le Radar capte surtout le calme. Même les notifications semblent avoir pris leur après-midi.';
+  const counts = new Map();
+  for (const i of safe) {
+    const t = themeFor(i);
+    if (t === 'Sécurité & faits divers' || t === 'Santé & solidarité') continue;
+    counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  const theme = [...counts.entries()].sort((a,b) => b[1] - a[1])[0]?.[0] ?? 'Vie locale';
+  const lines = NIKO_LINES[theme] ?? NIKO_LINES['Vie locale'];
+  const day = Number(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',day:'2-digit'}).format(new Date(d.now))) || 1;
+  return lines[day % lines.length];
 }
 
 const slug = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
   .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 
 export function toFacebookText(run, {
-  url = 'https://nikoju1977.github.io/radar-de-niko/quotidien.html'
+  url = 'https://nikoju1977.github.io/radar-de-niko/quotidien.html',
+  v3Graph = null
 } = {}) {
-  const d = buildDaily(run);
+  const d = buildDaily(run, Date.now(), v3Graph);
   const lines = [
     '📰 LE QUOTIDIEN DU RADAR 44',
     DATE.format(new Date(d.now)),
@@ -87,10 +145,22 @@ export function toFacebookText(run, {
     ''
   ];
   if (d.lead) lines.push('À LA UNE — ' + d.lead.title, '');
+  lines.push('LA NOTE DE NIKO — ' + nikoNote(d), '');
+  const seenEvents = new Set();
   for (const [theme, items] of d.groups) {
-    if (!items.length) continue;
-    lines.push('▸ ' + theme + ' (' + items.length + ')');
-    for (const i of items.slice(0, 2)) lines.push('• ' + i.title);
+    const unique = [];
+    for (const i of items) {
+      const eid = d.graph.articleToEvent[i.id] ?? i.id;
+      if (seenEvents.has(eid)) continue;
+      seenEvents.add(eid);
+      const event = d.graph.events.find(e => e.id === eid);
+      unique.push({ item:i, event });
+    }
+    if (!unique.length) continue;
+    lines.push('▸ ' + theme + ' (' + unique.length + ')');
+    for (const { item, event } of unique.slice(0, 2)) {
+      lines.push('• ' + item.title + (event?.multiSource ? ' [' + event.sourceCount + ' sources]' : ''));
+    }
     lines.push('');
   }
   lines.push('📖 Lire le journal complet : ' + url);
@@ -104,11 +174,13 @@ function storyPhoto(i, cls="story-photo", eager=false) {
   return `<figure class="${cls}"><img src="${esc(i.imageUrl)}" alt="${esc(i.title)}" loading="${eager ? "eager" : "lazy"}" decoding="async" referrerpolicy="no-referrer" onerror="this.parentElement.remove()"></figure>`;
 }
 
-function articleRow(i, leadId=null, showPhoto=true) {
+function articleRow(i, leadId=null, showPhoto=true, event=null) {
   if (i.id === leadId) return '';
+  const media = mediaFor(i);
+  const journalist = journalistFor(i);
   return `<article class="story">
     ${showPhoto ? storyPhoto(i) : ''}
-    <div class="story-meta"><time datetime="${esc(i.publishedAt)}">${esc(TIME.format(new Date(i.publishedAt)))}</time><span>${esc(i.author || i.source)}</span></div>
+    <div class="story-meta"><time datetime="${esc(i.publishedAt)}">${esc(TIME.format(new Date(i.publishedAt)))}</time><span>${esc(media)}${journalist ? ' · ' + esc(journalist) : ''}</span>${event?.multiSource ? `<a class="multi" href="v3/#${esc(event.id)}">${event.sourceCount} sources</a>` : ''}</div>
     <h3><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
     ${i.summary ? `<p>${esc(i.summary.slice(0, 300))}</p>` : ''}
   </article>`;
@@ -117,23 +189,46 @@ function articleRow(i, leadId=null, showPhoto=true) {
 export function toDailyHTML(run, {
   title = 'Le Quotidien du Radar 44',
   home = './',
-  facebookUrl = 'facebook.txt'
+  facebookUrl = 'facebook.txt',
+  v3Graph = null
 } = {}) {
-  const d = buildDaily(run);
+  const d = buildDaily(run, Date.now(), v3Graph);
   const lead = d.lead;
+  const note = nikoNote(d);
+  const eventById = new Map(d.graph.events.map(e => [e.id, e]));
+  const eventFor = i => eventById.get(d.graph.articleToEvent[i.id]);
+  const leadEvent = lead ? eventFor(lead) : null;
+  const renderedEvents = new Set(leadEvent ? [leadEvent.id] : []);
   let photoBudget = 8;
-  const sections = [...d.groups.entries()].filter(([, items]) => items.some(i => i.id !== lead?.id)).map(([theme, items]) => {
-    const body=items.map(i => {
-      const usePhoto = i.id !== lead?.id && Boolean(i.imageUrl) && photoBudget > 0;
+  const sectionData = [...d.groups.entries()].map(([theme, items]) => {
+    const localSeen = new Set();
+    const unique = [];
+    for (const i of items) {
+      const event = eventFor(i);
+      const key = event?.id ?? i.id;
+      if (localSeen.has(key)) continue;
+      localSeen.add(key);
+      unique.push({ item:i, event, key });
+    }
+    return [theme, unique];
+  });
+  const sections = sectionData.map(([theme, entries]) => {
+    const visible = entries.filter(({ item, key }) => item.id !== lead?.id && !renderedEvents.has(key));
+    if (!visible.length) return '';
+    const body = visible.map(({ item:i, event, key }) => {
+      renderedEvents.add(key);
+      const usePhoto = Boolean(i.imageUrl) && photoBudget > 0;
       if (usePhoto) photoBudget--;
-      return articleRow(i, lead?.id, usePhoto);
+      return articleRow(i, lead?.id, usePhoto, event);
     }).join('');
-    return `<section class="theme" id="${slug(theme)}"><h2>${esc(theme)} <span>${items.length}</span></h2><div class="columns">${body}</div></section>`;
+    return `<section class="theme" id="${slug(theme)}"><h2>${esc(theme)} <span>${visible.length}</span></h2><div class="columns">${body}</div></section>`;
   }).join('');
-  const toc=[...d.groups.entries()].filter(([,items])=>items.length).map(([theme,items])=>
-    `<a href="#${slug(theme)}">${esc(theme)} <b>${items.length}</b></a>`).join('');
+  const toc = sectionData.map(([theme, entries]) => {
+    const count = entries.filter(({ item, key }) => item.id !== lead?.id && key !== leadEvent?.id).length;
+    return count ? `<a href="#${slug(theme)}">${esc(theme)} <b>${count}</b></a>` : '';
+  }).join('');
   const dayKey=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(d.now));
-  const shareJson=JSON.stringify(toFacebookText(run)).replace(/<\//g,'<\\/');
+  const shareJson=JSON.stringify(toFacebookText(run, { v3Graph: d.graph })).replace(/<\//g,'<\\/');
 
   return `<!doctype html>
 <html lang="fr"><head>
@@ -177,7 +272,10 @@ h1{font:900 clamp(46px,9vw,92px)/.82 Georgia,serif;letter-spacing:-.055em;margin
 .theme>h2 span{float:right;font:700 12px Arial,sans-serif;color:var(--muted);margin-top:9px}
 .columns{columns:2 330px;column-gap:28px;column-rule:1px solid var(--rule)}
 .story{break-inside:avoid;padding:0 0 16px;margin:0 0 16px;border-bottom:1px solid var(--rule)}
-.story-meta{display:flex;gap:9px;flex-wrap:wrap;color:var(--red);font:700 10px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.story-meta{display:flex;gap:9px;flex-wrap:wrap;align-items:center;color:var(--red);font:700 10px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.story-meta .multi{border:1px solid var(--red);padding:2px 5px;text-decoration:none;color:var(--red)}
+.edition-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink);border:1px solid var(--ink);margin:0 0 20px}.edition-stats div{background:var(--cream);padding:10px;text-align:center;font:700 11px Arial,sans-serif;text-transform:uppercase}.edition-stats b{display:block;font:900 24px Georgia,serif;color:var(--red)}
+.niko-note{margin:22px 0 28px;border:3px double var(--ink);padding:16px 20px;background:var(--cream);position:relative}.niko-note:before{content:'N';position:absolute;right:14px;top:-8px;font:900 74px/1 Georgia,serif;color:rgba(152,42,32,.08)}.niko-note h2{font:900 25px/1 Georgia,serif;margin:3px 0 8px}.niko-note p{font:italic 18px/1.5 Georgia,serif;margin:0;max-width:850px}
 .story h3{font:800 21px/1.13 Georgia,serif;margin:5px 0}
 .story h3 a{color:var(--ink);text-decoration:none}.story h3 a:hover{text-decoration:underline}
 .story p{color:var(--muted);margin:6px 0 0;font-size:14px}
@@ -200,12 +298,12 @@ details{margin-top:12px;border-top:1px solid var(--rule);padding-top:8px}summary
 .empty{padding:50px 0;color:var(--muted)}
 footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:var(--muted);font-size:12px}
 .toast{position:fixed;right:16px;bottom:16px;background:var(--ink);color:var(--cream);padding:10px 14px;font:700 13px Arial,sans-serif;z-index:10}
-@media(max-width:720px){.lead{grid-template-columns:1fr}.lead-side{border-left:0;border-top:1px solid var(--rule);padding:12px 0 0}.game-grid{grid-template-columns:1fr}.game.wide{grid-column:auto}.columns{columns:1}.topline{font-size:9px}}
+@media(max-width:720px){.lead{grid-template-columns:1fr}.lead-side{border-left:0;border-top:1px solid var(--rule);padding:12px 0 0}.game-grid{grid-template-columns:1fr}.game.wide{grid-column:auto}.columns{columns:1}.topline{font-size:9px}.edition-stats{grid-template-columns:repeat(2,1fr)}}
 @page{size:A4;margin:11mm 10mm 13mm}
 @media print{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   html{background:#fff;font-size:10pt}body{max-width:none;padding:0;background:#fff;line-height:1.36}
-  .actions,.toc,.toast{display:none!important}.mast{padding:4mm 0 3mm}.brand-mark{width:12mm;height:12mm;margin-bottom:2mm}
+  .actions,.toc,.toast{display:none!important}.mast{padding:4mm 0 3mm}.brand-mark{width:12mm;height:12mm;margin-bottom:2mm}.edition-stats{margin-bottom:4mm}.niko-note{break-inside:avoid;padding:4mm;margin:5mm 0}
   h1{font-size:38pt;line-height:.88}.deck{font-size:9.5pt}.topline{font-size:7.5pt}
   .lead{gap:5mm;padding:4mm 0 5mm}.lead h2{font-size:27pt}.lead .summary{font-size:11pt;line-height:1.4}.lead-photo{max-height:62mm;aspect-ratio:16/7}
   .theme{break-inside:auto;margin-top:6mm}.theme>h2{font-size:18pt;padding:2mm 0;margin-bottom:3mm}
@@ -221,9 +319,10 @@ footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:v
   <img class="brand-mark" src="icons/icon-192.png" alt="Radar 44" width="48" height="48">
   <div class="kicker">Toute l’actualité régionale des dernières 24 heures</div>
   <h1>${esc(title)}</h1>
-  <p class="deck">${esc(DATE.format(new Date(d.now)))} · ${d.items.length} informations retenues et classées par thématiques</p>
+  <p class="deck">${esc(DATE.format(new Date(d.now)))} · ${d.items.length} articles regroupés en ${d.graph.stats.events} sujets</p>
   <div class="actions">
     <a href="${esc(home)}">← Radar en direct</a>
+    <a href="v3/">◎ Événements V3</a>
     <button type="button" class="primary" id="copy">Copier pour Facebook</button>
     <button type="button" id="share">Partager</button>
     <button type="button" id="pdf">Exporter PDF</button>
@@ -232,10 +331,12 @@ footer{margin-top:50px;border-top:5px double var(--ink);padding-top:12px;color:v
   </div>
 </header>
 <nav class="toc" aria-label="Sommaire">${toc}</nav>
-${lead ? `<section class="lead">${storyPhoto(lead, "lead-photo", true)}<div><div class="kicker">À la une</div><h2><a href="${esc(lead.url)}" target="_blank" rel="noopener">${esc(lead.title)}</a></h2><p class="summary">${esc(lead.summary || 'Retrouvez l’article complet auprès de la source originale.')}</p></div><aside class="lead-side"><strong>${esc(themeFor(lead))}</strong><p>${esc(lead.author || lead.source)}</p><p>Publié à ${esc(TIME.format(new Date(lead.publishedAt)))}</p><a href="${esc(lead.url)}" target="_blank" rel="noopener">Lire la source →</a></aside></section>` : ''}
+<section class="edition-stats" aria-label="Indicateurs de l'édition"><div><b>${d.graph.stats.events}</b>sujets</div><div><b>${d.graph.stats.multiSourceEvents}</b>multi-sources</div><div><b>${d.graph.stats.media}</b>médias</div><div><b>${d.graph.stats.journalists}</b>signatures</div></section>
+${lead ? `<section class="lead">${storyPhoto(lead, "lead-photo", true)}<div><div class="kicker">À la une</div><h2><a href="${esc(lead.url)}" target="_blank" rel="noopener">${esc(lead.title)}</a></h2><p class="summary">${esc(lead.summary || 'Retrouvez l’article complet auprès de la source originale.')}</p></div><aside class="lead-side"><strong>${esc(themeFor(lead))}</strong><p>${esc(mediaFor(lead))}${journalistFor(lead) ? ' · ' + esc(journalistFor(lead)) : ''}</p><p>Publié à ${esc(TIME.format(new Date(lead.publishedAt)))}</p>${eventFor(lead)?.multiSource ? `<p><a href="v3/#${esc(eventFor(lead).id)}">${eventFor(lead).sourceCount} sources suivent ce sujet →</a></p>` : ''}<a href="${esc(lead.url)}" target="_blank" rel="noopener">Lire la source →</a></aside></section>` : ''}
+<aside class="niko-note"><div class="kicker">Chronique légère</div><h2>La note de Niko</h2><p>${esc(note)}</p></aside>
 <main>${sections || '<p class="empty">Aucune information régionale des dernières 24 heures pour cette édition.</p>'}</main>
 ${toGamesHTML(dayKey)}
-<footer>Le Quotidien du Radar 44 est une édition automatique de veille. Les titres, extraits et liens renvoient vers leurs sources d’origine. Jeux générés localement pour cette édition.</footer>
+<footer>Le Quotidien du Radar 44 est une édition automatique de veille. Les titres, extraits et liens renvoient vers leurs sources d’origine. « La note de Niko » est une touche humoristique générée à partir des thèmes de l’édition et désactivée sur les sujets graves. Jeux générés localement pour cette édition.</footer>
 <script>
 (function(){
   var text=${shareJson};

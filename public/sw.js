@@ -1,8 +1,8 @@
 /* Radar de Niko — service worker.
  * Réseau d'abord pour la veille (toujours la plus fraîche en ligne),
  * cache en repli : hors ligne, la dernière veille reçue reste lisible. */
-const CACHE = 'radar-v3';
-const SHELL = ['./', 'index.html', 'quotidien.html', 'facebook.txt', 'radar.xml', 'radar.jsonl', 'manifest.webmanifest',
+const CACHE = 'radar-v4';
+const SHELL = ['./', 'index.html', 'quotidien.html', 'v3/index.html', 'v3/radar-v3.json', 'facebook.txt', 'radar.xml', 'radar.jsonl', 'manifest.webmanifest',
                'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon-32.png'];
 
 self.addEventListener('install', e => {
@@ -31,6 +31,11 @@ self.addEventListener('fetch', e => {
     return;
   }
   const isPage = req.mode === 'navigate';
+  const navKey = isPage
+    ? (/\/v3\/?(?:index\.html)?$/.test(url.pathname) ? 'v3/index.html'
+      : /\/quotidien\.html$/.test(url.pathname) ? 'quotidien.html'
+      : './')
+    : req;
   // Une requête de navigation ne peut pas être recopiée avec des options
   // (TypeError sur Chrome et Safari) : on en reconstruit une à partir de l'URL.
   const net = isPage
@@ -40,11 +45,10 @@ self.addEventListener('fetch', e => {
     net.then(res => {
       if (res.ok) {
         const copy = res.clone();
-        // Une seule entrée pour la page, quels que soient les paramètres (?f=new, ?source=pwa)
-        caches.open(CACHE).then(c => c.put(isPage ? './' : req, copy));
+        caches.open(CACHE).then(c => c.put(navKey, copy));
       }
       return res;
-    }).catch(() => caches.match(isPage ? './' : req, { ignoreSearch: true })
+    }).catch(() => caches.match(navKey, { ignoreSearch: true })
       .then(hit => hit || (isPage ? caches.match('index.html') : Response.error())))
   );
 });

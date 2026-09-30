@@ -1,10 +1,40 @@
 {
-  "_doc": "Flux fixes RSS/Atom gratuits, sans clé. Priorité aux sources hyperlocales et officielles ; filtrage par fraîcheur via maxAgeDays. Flux emploi ajoutés et vérifiés le 2026-09-30.",
+  "_doc": "Flux fixes RSS/Atom gratuits, sans clé. Couverture V3 élargie à la Loire-Atlantique ; chaque panne de flux est isolée et n'interrompt pas le Radar.",
   "feeds": [
     {
       "name": "L'Éclaireur de Châteaubriant",
       "url": "https://actu.fr/l-eclaireur-de-chateaubriant/rss.xml",
       "maxAgeDays": 14
+    },
+    {
+      "name": "Actu44",
+      "url": "https://www.actu44.fr/feed/",
+      "maxAgeDays": 14
+    },
+    {
+      "name": "Actu Nantes",
+      "url": "https://actu.fr/nantes/rss.xml",
+      "maxAgeDays": 14
+    },
+    {
+      "name": "Le Courrier du Pays de Retz",
+      "url": "https://actu.fr/le-courrier-du-pays-de-retz/rss.xml",
+      "maxAgeDays": 14
+    },
+    {
+      "name": "L'Écho de la Presqu'île",
+      "url": "https://actu.fr/l-echo-de-la-presqu-ile/rss.xml",
+      "maxAgeDays": 14
+    },
+    {
+      "name": "L'Hebdo de Sèvre et Maine",
+      "url": "https://actu.fr/l-hebdo-de-sevre-et-maine/rss.xml",
+      "maxAgeDays": 14
+    },
+    {
+      "name": "20 Minutes · Nantes",
+      "url": "https://www.20minutes.fr/feeds/rss-nantes.xml",
+      "maxAgeDays": 7
     },
     {
       "name": "Mairie de Châteaubriant · Agenda",
@@ -33,7 +63,7 @@
     },
     {
       "name": "ICI Loire Océan",
-      "url": "https://www.francebleu.fr/rss/loire-ocean/a-la-une.xml",
+      "url": "https://www.ici.fr/rss/loire-ocean/rubrique/infos.xml",
       "maxAgeDays": 7
     },
     {
@@ -75,7 +105,12 @@
     "\"Moisdon-la-Rivière\"",
     "Nozay Loire-Atlantique",
     "Derval Loire-Atlantique",
-    "Rougé Loire-Atlantique"
+    "Rougé Loire-Atlantique",
+    "Nantes Loire-Atlantique",
+    "Saint-Nazaire Loire-Atlantique",
+    "Pornic Loire-Atlantique",
+    "Guérande Loire-Atlantique",
+    "Ancenis Loire-Atlantique"
   ],
   "jobFeeds": [
     {
