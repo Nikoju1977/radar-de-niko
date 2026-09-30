@@ -1,6 +1,8 @@
 name: Radar
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       query:
