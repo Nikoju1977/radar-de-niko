@@ -23,6 +23,7 @@ import { setReach } from './radar-collectors.mjs';
 import { toHTML } from './radar-page.mjs';
 import { toDailyHTML, toFacebookText } from './radar-daily.mjs';
 import { buildRadarV3, toV3JSON, toV3HTML } from './radar-v3.mjs';
+import { collectDailyServices, servicesJSON } from './radar-services.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback = null) => {
@@ -125,6 +126,7 @@ if (statePath) {
 }
 
 const v3Graph = buildRadarV3(run);
+const dailyServices = flag('stub') ? null : await collectDailyServices(run);
 
 await mkdir(outDir, { recursive: true });
 await mkdir(`${outDir}/v3`, { recursive: true });
@@ -136,14 +138,15 @@ await import('node:fs/promises').then(fs => fs.cp(new URL('./public/', import.me
   .catch(e => console.error(`public/ non copié : ${e.message}`));
 await writeFile(`${outDir}/index.html`, toHTML(run, { every: Number(arg('every', 15)) }));
 await writeFile(`${outDir}/v3/radar-v3.json`, toV3JSON(v3Graph));
+if (dailyServices) await writeFile(`${outDir}/services.json`, servicesJSON(dailyServices));
 await writeFile(`${outDir}/v3/index.html`, toV3HTML(v3Graph));
-await writeFile(`${outDir}/quotidien.html`, toDailyHTML(run, { v3Graph }));
-await writeFile(`${outDir}/facebook.txt`, toFacebookText(run, { v3Graph }) + '\n');
+await writeFile(`${outDir}/quotidien.html`, toDailyHTML(run, { v3Graph, services: dailyServices }));
+await writeFile(`${outDir}/facebook.txt`, toFacebookText(run, { v3Graph, services: dailyServices }) + '\n');
 
 console.log(toDigest(run));
 
 const failed = run.reports.filter(r => r.status === 'error');
-console.log(`→ ${outDir}/radar.xml · radar.jsonl · radar.md · quotidien.html · v3/index.html · v3/radar-v3.json · facebook.txt`);
+console.log(`→ ${outDir}/radar.xml · radar.jsonl · radar.md · quotidien.html · v3/index.html · v3/radar-v3.json · services.json · facebook.txt`);
 if (failed.length) console.log(`⚠ ${failed.length} source(s) en échec — la veille reste exploitable.`);
 
 // Annotations GitHub Actions : chaque panne visible dans l'interface du run.
