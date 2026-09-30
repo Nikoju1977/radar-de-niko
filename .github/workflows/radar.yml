@@ -23,7 +23,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: radar-main-${{ github.ref }}
+  # Un commit de PR ne doit pas être bloqué par un ancien run Playwright.
+  # Sur main / workflow_dispatch, github.ref reste la clé stable anti-doublons.
+  group: radar-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
