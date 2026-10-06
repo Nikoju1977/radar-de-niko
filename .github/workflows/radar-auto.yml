@@ -2,7 +2,9 @@
 name: Radar Auto
 
 on:
-  # Déclenché toutes les 15 minutes par Radar Clock.
+  # Déclenchement autonome : un échec n'empêche pas le cycle suivant.
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_dispatch:
   # Permet de valider immédiatement ce workflow lorsqu'il est modifié.
   push:
