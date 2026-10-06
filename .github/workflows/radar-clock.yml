@@ -1,25 +1,18 @@
-# Horloge auto-réarmante : déclenche Radar Auto toutes les 15 minutes ; validation des sources incluse.
+# Déclencheur manuel de secours.
+# Le fonctionnement périodique est désormais assuré directement par le cron de Radar Auto.
 name: Radar Clock
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/radar-clock.yml'
 
 permissions:
   actions: write
   contents: read
 
-concurrency:
-  group: radar-clock
-  cancel-in-progress: true
-
 jobs:
   clock:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - name: Déclencher Radar Auto
         env:
@@ -28,22 +21,6 @@ jobs:
           set -euo pipefail
           for tentative in 1 2 3; do
             if gh workflow run radar-auto.yml --repo "${GITHUB_REPOSITORY}" --ref main; then
-              exit 0
-            fi
-            sleep 10
-          done
-          exit 1
-
-      - name: Attendre 15 minutes
-        run: sleep 900
-
-      - name: Réarmer l'horloge
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          for tentative in 1 2 3; do
-            if gh workflow run radar-clock.yml --repo "${GITHUB_REPOSITORY}" --ref main; then
               exit 0
             fi
             sleep 10
