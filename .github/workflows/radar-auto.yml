@@ -11,6 +11,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/radar-auto.yml'
+      - 'radar-page.mjs'
+      - 'public/**'
 
 permissions:
   contents: read
