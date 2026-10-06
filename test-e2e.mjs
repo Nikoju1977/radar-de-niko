@@ -190,6 +190,8 @@ ok('page : seul le déclenchement manuel utilise fetch côté navigateur',
    browserFetchCount === 1 &&
    html.includes("fetch('https://radar-de-niko-backend-nikoju1977s-projects.vercel.app/api/refresh'") &&
    !/XMLHttpRequest/.test(html));
+ok('page : repli GitHub vers Radar Auto si le backend échoue',
+   html.includes("location.href='https://github.com/Nikoju1977/radar-de-niko/actions/workflows/radar-auto.yml'"));
 ok('page : un seul identifiant par item', new Set(html.match(/<li id="[^"]+"/g)).size === run.items.length);
 ok('page : accès au quotidien régional', html.includes('href="quotidien.html"'));
 ok('page : accès à Radar44 V3', html.includes('href="v3/"'));
