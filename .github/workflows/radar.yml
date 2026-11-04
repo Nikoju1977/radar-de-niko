@@ -46,7 +46,8 @@ jobs:
         run: python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('dist/radar.xml'); print('RSS valide')"
 
   pwa:
-    runs-on: ubuntu-latest
+    # Playwright 1.55 ne prend pas en charge l'image Ubuntu 26.04 de ubuntu-latest.
+    runs-on: ubuntu-24.04
     if: always()
     steps:
       - uses: actions/checkout@v5
